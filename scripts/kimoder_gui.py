@@ -58,6 +58,19 @@ def ap():
             dpg.set_value(LK,"link: offline")
             dpg.configure_item(LK,color=(110,110,110))
     if dpg.does_item_exist("btn_demo_stop"): dpg.configure_item("btn_demo_stop",enabled=_ds["running"])
+_wrap_cache={"chars":0}
+def _render_log(force=False):
+    if not dpg.does_item_exist(LG): return
+    try: w=dpg.get_item_rect_size(LG)[0]
+    except Exception: return
+    chars=max(40,int((w-40)/7))
+    if not force and chars==_wrap_cache["chars"]: return
+    _wrap_cache["chars"]=chars
+    out=[]
+    for line in _logbuf:
+        out.extend(textwrap.wrap(line,width=chars,replace_whitespace=False,drop_whitespace=False) or [""])
+    if len(out)>800: out=out[-800:]
+    dpg.set_value(LG,"\n".join(out))
 def dq():
     for _ in range(200):
         try: k,p=_q.get_nowait()
@@ -66,11 +79,10 @@ def dq():
         elif k=="demo_state": _ds.update(p); ap()
         elif k=="vram" and dpg.does_item_exist(VT): dpg.set_value(VT,p)
         elif k=="ram" and dpg.does_item_exist(RT): dpg.set_value(RT,p)
-        elif k=="log" and dpg.does_item_exist(LG):
-            for seg in textwrap.wrap(p, width=90, replace_whitespace=False, drop_whitespace=False) or [""]:
-                _logbuf.append(seg)
+        elif k=="log":
+            _logbuf.append(p)
             if len(_logbuf)>400: del _logbuf[:200]
-            dpg.set_value(LG,"\n".join(_logbuf))
+            _render_log(force=True)
 def tf(fn,tg):
     off=0; first=True
     while not _sd.is_set():
@@ -243,7 +255,7 @@ def main():
               threading.Thread(target=hw,daemon=True),
               threading.Thread(target=mw,daemon=True)]: w.start()
     try:
-        while dpg.is_dearpygui_running(): dq(); dpg.render_dearpygui_frame()
+        while dpg.is_dearpygui_running(): dq(); _render_log(); dpg.render_dearpygui_frame()
     finally: co(); dpg.destroy_context()
     return 0
 if __name__=="__main__": sys.exit(main())
