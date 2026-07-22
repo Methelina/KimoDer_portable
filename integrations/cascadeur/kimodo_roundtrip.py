@@ -1657,15 +1657,16 @@ def _start_kimodo_backend(config, preload_dataset, reporter, text_encoder_mode="
 
     if _native_mode(config):
         profile = "fallback" if normalized_mode == "fallback" else "llama"
-        ps1_args = [
-            "-PreloadDataset", preload_dataset,
-            "-Port", str(KIMODO_BACKEND_PORT),
-            "-TextEncoderProfile", profile,
+        ctl_args = [
+            "start",
+            "--profile", profile,
+            "--preload-dataset", preload_dataset,
+            "--port", str(KIMODO_BACKEND_PORT),
         ]
         lines = _run_native_script(
             config,
-            "start_backend.ps1",
-            ps1_args,
+            "backend_ctl.py",
+            ctl_args,
             reporter,
             "Starting Kimodo backend...",
             "Failed to start Kimodo backend.",
@@ -1721,8 +1722,8 @@ def _stop_kimodo_backend(config, reporter):
     if _native_mode(config):
         _run_native_script(
             config,
-            "stop_backend.ps1",
-            ["-Port", str(KIMODO_BACKEND_PORT)],
+            "backend_ctl.py",
+            ["stop", "--port", str(KIMODO_BACKEND_PORT)],
             reporter,
             "Stopping Kimodo backend...",
             "Failed to stop Kimodo backend.",

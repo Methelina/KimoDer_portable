@@ -69,8 +69,6 @@ Repository/
 ├── scripts/
 │   ├── kimoder_gui.py             # DearPyGui control panel
 │   ├── backend_ctl.py             # Backend + demo lifecycle (CLI + module)
-│   ├── start_backend.ps1          # shim → backend_ctl (roundtrip compat)
-│   ├── stop_backend.ps1           # shim → backend_ctl
 │   ├── install_cascadeur_command.ps1  # copies plugin into Cascadeur
 │   └── cascadeur_backend_service.py   # HTTP backend (port 9552)
 └── tools/io_scene_fbx/            # Blender FBX addon modules (Python-only)

@@ -1001,16 +1001,17 @@ function Start-CascadeurBackend {
         Write-Status "Patch was not applied. Model loading may fail." "WARN"
     }
 
-    $BackendScript = Join-Path $ScriptPath "scripts\start_backend.ps1"
+    $BackendScript = Join-Path $ScriptPath "scripts\backend_ctl.py"
     if (-not (Test-Path $BackendScript)) {
         Write-Status "Backend script not found: $BackendScript. Install hybrid components first." "ERROR"
         return $false
     }
+    $PythonExe = Join-Path $ScriptPath "kimodo_env\Scripts\python.exe"
 
     $ProfileLabel = if ($Profile -eq "fallback") { "LLAMA OFF" } else { "LLAMA NF4" }
     Write-Status "Starting Kimodo Cascadeur backend ($ProfileLabel)..." "INFO"
 
-    & $BackendScript -TextEncoderProfile $Profile
+    & $PythonExe $BackendScript start --profile $Profile
     if ($LASTEXITCODE -eq 0) {
         Write-Status "Backend running at http://127.0.0.1:9552" "SUCCESS"
     } else {
@@ -1020,13 +1021,14 @@ function Start-CascadeurBackend {
 }
 
 function Stop-CascadeurBackend {
-    $BackendScript = Join-Path $ScriptPath "scripts\stop_backend.ps1"
+    $BackendScript = Join-Path $ScriptPath "scripts\backend_ctl.py"
+    $PythonExe = Join-Path $ScriptPath "kimodo_env\Scripts\python.exe"
     if (-not (Test-Path $BackendScript)) {
         Write-Status "Backend script not found." "ERROR"
         return $false
     }
     Write-Status "Stopping Kimodo Cascadeur backend..." "INFO"
-    & $BackendScript
+    & $PythonExe $BackendScript stop
     return $true
 }
 
