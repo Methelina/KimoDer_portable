@@ -1,0 +1,51 @@
+# Virtual environment (created by installer)
+kimodo_env/
+
+# Cloned repositories (created by installer)
+kimodo/
+!kimodo_addons/
+
+# Downloaded models
+KIMODO-Meta3_llm2vec_NF4/
+checkpoints/
+text-encoders/
+.hf-cache/
+.venv/
+.wheels/
+
+# Caches & temporary
+.cache/
+__pycache__/
+*.pyc
+*.pyo
+uv_tmp/
+uv.zip
+
+# Runtime output
+logs/
+output/
+*.log
+
+# Runtime temp
+kimodo-runtime/
+KimodoCascadeur/
+
+# OS files
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archive files
+*.7z
+*.zip
+*.rar
+
+# Environment
+.env
+.env.local
