@@ -453,6 +453,13 @@ def run_generation_job(state, job):
         emit_memory_snapshot(job, "Before job")
         frame_indices, global_positions, global_rot_mats, position_offset = load_constraints(payload["constraints"])
 
+        if frame_indices.shape[0] < 2:
+            raise RuntimeError(
+                f"Constraints contain only {frame_indices.shape[0]} frame(s). "
+                "The model computes velocity between frames and requires at least 2 frames "
+                "in the selected interval. Select a longer keyframe range in Cascadeur."
+            )
+
         metadata = {
             "constraints": payload["constraints"],
             "output": payload.get("output", ""),

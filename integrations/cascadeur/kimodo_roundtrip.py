@@ -2411,6 +2411,13 @@ def _run_roundtrip(scene, config, settings, reporter, rig_owner=None, rig_label=
             rotation_post_basis=CASCADEUR_TO_KIMODO_ROT_BASIS,
         )
 
+        if len(constraint_frames) < 2:
+            raise RuntimeError(
+                f"Only {len(constraint_frames)} constraint frame(s) extracted. "
+                "Kimodo needs at least 2 frames in the interval to compute motion. "
+                "Select a longer keyframe range on the Cascadeur timeline before generating."
+            )
+
         reporter.update(
             f"Generating motion in Kimodo headlessly ({len(constraint_frames)} source constraint frames, {num_frames} total)..."
         )
