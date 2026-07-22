@@ -13,7 +13,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent; sys.path.insert(0, str(SCRIPT_DIR)
 import backend_ctl as bc
 import dearpygui.dearpygui as dpg
 SC="status_circle"; ST="status_text"; DC="demo_circle"; DST="demo_text"; IT="backend_info"; VT="vram_text"; RT="ram_text"; DT="demo_status"; LG="log_area"; LK="cascadeur_link"
-SH="sect_backend"; DH="sect_viser"
+SH="sect_backend"; DH="sect_viser"; GL="gpu_label"; RL="ram_label"; CK="autoscroll_cb"; VP="viser_port"; BV="btn_open_viser"; GH="btn_github"; LF="btn_log_folder"
 _q=queue.Queue(); _sd=threading.Event()
 _st={"ok":False,"warming_up":False,"busy":False,"warmup_error":"","device":"-","text_encoder_profile":"-","loaded_datasets":[],"clients":{}}
 _ds={"running":False,"pid":0,"port":0,"ready":False}; _owned=False; _logbuf=[]; LB=8000
@@ -58,7 +58,18 @@ def ap():
         else:
             dpg.set_value(LK,"link: offline")
             dpg.configure_item(LK,color=(110,110,110))
-    if dpg.does_item_exist("btn_demo_stop"): dpg.configure_item("btn_demo_stop",enabled=_ds["running"])
+    if dpg.does_item_exist(VP):
+        if _ds["running"]: dpg.set_value(VP,f"(port {_ds['port']})"); dpg.configure_item(VP,color=(255,200,100))
+        else: dpg.set_value(VP,"")
+    if dpg.does_item_exist(BV):
+        if _ds.get("ready"):
+            dpg.configure_item(BV,enabled=True)
+            dpg.bind_item_theme(BV,0); dpg.bind_item_theme(BV,"viser_green")
+            if dpg.does_item_exist("viser_tt"): dpg.set_value("viser_tt",f"http://127.0.0.1:{_ds['port']}")
+        else:
+            dpg.configure_item(BV,enabled=False)
+            dpg.bind_item_theme(BV,0); dpg.bind_item_theme(BV,"viser_dark")
+            if dpg.does_item_exist("viser_tt"): dpg.set_value("viser_tt","Viser Not Started yet")
 _wrap_cache={"chars":0}
 def _render_log(force=False):
     if not dpg.does_item_exist(LG): return
@@ -84,6 +95,16 @@ def dq():
             _logbuf.append(p)
             if len(_logbuf)>400: del _logbuf[:200]
             _render_log(force=True)
+            if _ds.get("port") and not _ds.get("ready"):
+                if "[Kimodo Viser" in p and "listening" in p.lower():
+                    import urllib.request
+                    try:
+                        urllib.request.urlopen(f"http://127.0.0.1:{_ds['port']}",timeout=2)
+                        _q.put(("demo_state",{"running":True,"ready":True,"pid":_ds.get("pid",0),"port":_ds["port"]}))
+                        ct("GUI","+ viser listening detected, HTTP verified")
+                    except: pass
+    if dpg.does_item_exist(CK) and dpg.does_item_exist(LG):
+        dpg.configure_item(LG,tracked=dpg.get_value(CK))
 def tf(fn,tg):
     off=0; first=True
     while not _sd.is_set():
@@ -129,11 +150,12 @@ def mw():
             o=subprocess.run(["nvidia-smi","--query-gpu=memory.used,memory.total,utilization.gpu","--format=csv,noheader,nounits"],capture_output=True,text=True,timeout=5,creationflags=bc.hidden_flags())
             if o.returncode==0 and o.stdout.strip():
                 u,t,ut=[x.strip() for x in o.stdout.strip().split(",")[0:3]]
-                _q.put(("vram",f"VRAM {u}/{t} MiB   GPU {ut}%"))
+                ug=int(u)//1024; tg=int(t)//1024
+                _q.put(("vram",f"<{ut}%> VRAM: {ug}/{tg}Gb"))
         except: pass
         try:
             import psutil; vm=psutil.virtual_memory()
-            _q.put(("ram",f"RAM {vm.used/(1024**3):.1f}/{vm.total/(1024**3):.1f} GB ({vm.percent}%)"))
+            _q.put(("ram",f"<{vm.percent}%> {vm.used/(1024**3):.1f}/{vm.total/(1024**3):.1f}Gb"))
         except: pass
         _sd.wait(3.0)
 def sb(p):
@@ -154,18 +176,19 @@ def sdm():
         global _owned
         a,pid,port=bc.demo_status()
         if a: ct("GUI",f">>> demo already running on :{port}, opening browser."); webbrowser.open(f"http://127.0.0.1:{port}"); return
-        ct("GUI",">>> starting demo (model load takes 1-2 min) ...")
+        ct("GUI",">>> starting demo (model load may take up to 8 min) ...")
         pid,port=bc.start_demo(status_cb=lambda m:ct("GUI",f"STATUS: {m}"))
         if not pid: ct("GUI",">>> demo failed to start."); return
-        _owned=True; url=f"http://127.0.0.1:{port}"
-        import urllib.request; dl=time.time()+240
+        _owned=True; url=f"http://127.0.0.1:{port}"; import urllib.request
+        dl=time.time()+480
         while time.time()<dl:
-            try:
-                with urllib.request.urlopen(url,timeout=2) as r:
-                    if r.status==200: break
-            except: pass
-            time.sleep(2)
-        else: ct("GUI",f">>> demo did not respond on {url} within 240s."); return
+            if _ds.get("ready") and _ds.get("port")==port:
+                try:
+                    with urllib.request.urlopen(url,timeout=2) as r:
+                        if r.status==200: break
+                except: pass
+            time.sleep(0.5)
+        else: ct("GUI",f">>> demo did not respond on {url} within 480s."); return
         ct("GUI",f">>> demo ready at {url}"); webbrowser.open(url)
     threading.Thread(target=w,daemon=True).start()
 def spd():
@@ -192,6 +215,14 @@ def bg():
             dpg.add_theme_style(dpg.mvStyleVar_FrameRounding,4)
             dpg.add_theme_style(dpg.mvStyleVar_WindowRounding,6)
     dpg.bind_theme(gt)
+    with dpg.theme() as viser_green:
+        with dpg.theme_component(dpg.mvButton):
+            dpg.add_theme_color(dpg.mvThemeCol_Button,(45,55,70))
+            dpg.add_theme_color(dpg.mvThemeCol_Text,(80,210,100))
+    with dpg.theme() as viser_dark:
+        with dpg.theme_component(dpg.mvButton):
+            dpg.add_theme_color(dpg.mvThemeCol_Button,(30,38,50))
+            dpg.add_theme_color(dpg.mvThemeCol_Text,(140,145,155))
     # Load ModeSeven bitmap fonts
     fonts_ok=False
     try:
@@ -211,10 +242,15 @@ def bg():
         with dpg.group(horizontal=True):
             dpg.add_text("KimoDer v2.3.0",tag="ver_text",color=(255,200,100))
             dpg.add_text("  |  by Soror L.'. L.'.",color=(140,145,155))
-            dpg.add_button(label="github",small=True,callback=lambda:webbrowser.open("https://github.com/Methelina/KimoDer_portable"))
+            dpg.add_button(label="github.com/Methelina",tag=GH,small=True,callback=lambda:webbrowser.open("https://github.com/Methelina/KimoDer_portable"))
+            with dpg.tooltip(GH):
+                dpg.add_text("Open KimoDer repository on GitHub")
             dpg.add_text("    ")
-            dpg.add_text("VRAM -",tag=VT,color=(180,185,195))
-            dpg.add_text("RAM -",tag=RT,color=(180,185,195))
+            dpg.add_text("GPU",tag=GL,color=(255,200,100))
+            dpg.add_text("<0%> VRAM: 0/0Gb",tag=VT,color=(180,185,195))
+            dpg.add_text(" || ",color=(140,145,155))
+            dpg.add_text("RAM",tag=RL,color=(255,200,100))
+            dpg.add_text("<0%> 0/0Gb",tag=RT,color=(180,185,195))
         dpg.add_separator()
 
         # ---- Cascadeur Backend ----
@@ -229,8 +265,14 @@ def bg():
         dpg.add_spacer(height=2)
         with dpg.group(indent=24):
             dpg.add_button(label="Start (LLAMA NF4)",tag="btn_start_nf4",callback=lambda:sb("llama"))
+            with dpg.tooltip("btn_start_nf4"):
+                dpg.add_text("Start backend with LLAMA NF4 text encoder (~5.4 GB VRAM)")
             dpg.add_button(label="Start (LLAMA OFF)",tag="btn_start_off",callback=lambda:sb("fallback"))
+            with dpg.tooltip("btn_start_off"):
+                dpg.add_text("Start backend with hash encoder (~0 VRAM, lower text quality)")
             dpg.add_button(label="Stop Backend",tag="btn_stop",callback=stb)
+            with dpg.tooltip("btn_stop"):
+                dpg.add_text("Stop the Cascadeur Backend service")
             dpg.add_text("link: offline",tag=LK,color=(110,110,110))
         dpg.add_separator()
 
@@ -240,17 +282,29 @@ def bg():
             with dpg.drawlist(width=20,height=20):
                 dpg.draw_circle(center=(10,10),radius=7,tag=DC,fill=(110,110,110))
             dpg.add_text("Kimodo Viser",tag=DH,color=(255,200,100))
+            dpg.add_text("",tag=VP,color=(255,200,100))
             dpg.add_text("  ")
             dpg.add_text("STOPPED",tag=DST,color=(110,110,110))
         with dpg.group(indent=24):
             dpg.add_text("",tag=DT,color=(160,165,175))
         with dpg.group(indent=24):
             dpg.add_button(label="Start Viser",tag="btn_demo_start",callback=sdm)
+            with dpg.tooltip("btn_demo_start"):
+                dpg.add_text("Launch Kimodo Viser web demo (model load up to 8 min)")
+            dpg.add_button(label="Open Viser",tag=BV,enabled=False,callback=lambda:webbrowser.open(f"http://127.0.0.1:{_ds['port']}"))
+            dpg.bind_item_theme(BV,"viser_dark")
             dpg.add_button(label="Stop Viser",tag="btn_demo_stop",callback=spd)
-            dpg.add_button(label="Log Folder",callback=olf)
+            with dpg.tooltip("btn_demo_stop"):
+                dpg.add_text("Stop the Kimodo Viser web demo")
+            dpg.add_button(label="Log Folder",tag=LF,callback=olf)
+            with dpg.tooltip(LF):
+                dpg.add_text("Open log folder in Explorer")
+            with dpg.tooltip(BV):
+                dpg.add_text("Viser Not Started yet",tag="viser_tt")
         dpg.add_separator()
 
         # ---- Log ----
+        dpg.add_checkbox(label="Auto-scroll",tag=CK,default_value=True)
         dpg.add_input_text(tag=LG,multiline=True,readonly=True,width=-1,height=-1,tracked=True)
     dpg.create_viewport(title="KimoDer -- Kimodo+Cascadeur Control",width=700,height=640)
     if fonts_ok:
