@@ -6,8 +6,8 @@ full backend log tail with colored levels and autoscroll.
 
 Launched by Run_KimoDer.ps1 via kimodo_env python.
 
-Version: 1.0.0
-Author:  Kilo
+Version: 1.1.0
+Author:  Soror L.'.L.'.
 """
 
 import json
@@ -32,6 +32,7 @@ STATUS_CIRCLE_TAG = "status_circle"
 STATUS_TEXT_TAG = "status_text"
 INFO_TAG = "backend_info"
 VRAM_TAG = "vram_text"
+RAM_TAG = "ram_text"
 PROGRESS_TAG = "warm_progress"
 
 MAX_LOG_LINES = 3000
@@ -136,6 +137,9 @@ def drain_queue():
         elif kind == "vram":
             if dpg.does_item_exist(VRAM_TAG):
                 dpg.set_value(VRAM_TAG, payload[0])
+        elif kind == "ram":
+            if dpg.does_item_exist(RAM_TAG):
+                dpg.set_value(RAM_TAG, payload[0])
 
 
 def _tail_log_worker():
@@ -192,7 +196,7 @@ def _health_worker():
         _shutdown.wait(1.0)
 
 
-def _vram_worker():
+def _metrics_worker():
     while not _shutdown.is_set():
         try:
             out = subprocess.run(
@@ -204,11 +208,20 @@ def _vram_worker():
                 capture_output=True,
                 text=True,
                 timeout=5,
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                creationflags=bc.hidden_flags(),
             )
             if out.returncode == 0 and out.stdout.strip():
                 used, total, util = [x.strip() for x in out.stdout.strip().split(",")[0:3]]
                 _ui_queue.put(("vram", f"VRAM {used}/{total} MiB   GPU {util}%"))
+        except Exception:
+            pass
+        try:
+            import psutil
+
+            vm = psutil.virtual_memory()
+            used_gb = vm.used / (1024 ** 3)
+            total_gb = vm.total / (1024 ** 3)
+            _ui_queue.put(("ram", f"RAM {used_gb:.1f}/{total_gb:.1f} GB ({vm.percent}%)"))
         except Exception:
             pass
         _shutdown.wait(3.0)
@@ -244,13 +257,6 @@ def _open_demo():
                 log_line("kimodo folder not found.", (235, 110, 110))
                 return
             env = bc.build_env("llama")
-            flags = 0
-            if os.name == "nt":
-                flags = (
-                    subprocess.CREATE_NO_WINDOW
-                    | subprocess.DETACHED_PROCESS
-                    | subprocess.CREATE_NEW_PROCESS_GROUP
-                )
             log_file = open(bc.runtime_dir() / "kimodo-demo.log", "w", encoding="utf-8", errors="replace")
             subprocess.Popen(
                 [str(bc.python_exe()), "-m", "kimodo.demo"],
@@ -258,7 +264,7 @@ def _open_demo():
                 env=env,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
-                creationflags=flags,
+                creationflags=bc.detached_flags(),
                 close_fds=True,
             )
             log_line("Demo starting on http://127.0.0.1:7860 ...", (130, 230, 140))
@@ -304,6 +310,11 @@ def build_gui():
     with dpg.window(tag="main_window", label="KimoDer Control", no_title_bar=True,
                     no_resize=False, no_collapse=True):
         with dpg.group(horizontal=True):
+            dpg.add_text("KimoDer v1.1.0", color=(140, 160, 220))
+            dpg.add_text("  |  by Soror L.'.L.'.", color=(110, 115, 125))
+        dpg.add_separator()
+
+        with dpg.group(horizontal=True):
             with dpg.drawlist(width=26, height=26):
                 dpg.draw_circle(center=(13, 13), radius=9, tag=STATUS_CIRCLE_TAG,
                                 fill=(110, 110, 110), color=(0, 0, 0, 0))
@@ -312,6 +323,8 @@ def build_gui():
             dpg.add_text("device: -", tag=INFO_TAG)
             dpg.add_text("|")
             dpg.add_text("VRAM -", tag=VRAM_TAG)
+            dpg.add_text("|")
+            dpg.add_text("RAM -", tag=RAM_TAG)
 
         dpg.add_separator()
 
@@ -340,7 +353,7 @@ def build_gui():
                               horizontal_scrollbar=True):
             pass
 
-    dpg.create_viewport(title="KimoDer — Kimodo+Cascadeur Control", width=980, height=640)
+    dpg.create_viewport(title="KimoDer — Kimodo+Cascadeur Control by Soror L.'.L.'.", width=980, height=640)
     dpg.setup_dearpygui()
     dpg.show_viewport()
     dpg.set_primary_window("main_window", True)
@@ -356,7 +369,7 @@ def main():
     workers = [
         threading.Thread(target=_tail_log_worker, daemon=True),
         threading.Thread(target=_health_worker, daemon=True),
-        threading.Thread(target=_vram_worker, daemon=True),
+        threading.Thread(target=_metrics_worker, daemon=True),
     ]
     for w in workers:
         w.start()

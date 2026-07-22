@@ -18,7 +18,7 @@
 #   .\Install_KimoDer-UV.ps1 -InstallCascadeurCommand -CascadeurRoot "path"
 # ==========================================================
 # Based on: Soror L.'.L.' launcher v2.4.1
-# Cascadeur integration: Kilo
+# Cascadeur integration: Soror L.'.L.'.
 # Version: 2.5.0-cascadeur
 # Date: 2026-07-22
 # ==========================================================
@@ -1240,7 +1240,7 @@ if (-not $Menu) {
         if ($InstallCascadeurCommand) {
             $cmdArgs = @{}
             if ($CascadeurRoot) { $cmdArgs.CascadeurRoot = $CascadeurRoot }
-            & (Join-Path $ScriptPath "install_cascadeur_command.ps1") @cmdArgs
+            & (Join-Path $ScriptPath "scripts\install_cascadeur_command.ps1") @cmdArgs
         }
     } catch {
         Write-Status "CLI ERROR: $_" "ERROR"
@@ -1303,7 +1303,7 @@ do {
         }
         "7" {
             if ($installed) {
-                $CmdInstaller = Join-Path $ScriptPath "install_cascadeur_command.ps1"
+                $CmdInstaller = Join-Path $ScriptPath "scripts\install_cascadeur_command.ps1"
                 if (Test-Path $CmdInstaller) {
                     & $CmdInstaller
                 } else {

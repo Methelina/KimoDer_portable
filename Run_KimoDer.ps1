@@ -83,7 +83,7 @@ if ($Script:CLI_MODE) {
         if ($InstallCascadeurCommand) {
             $cmdArgs = @{}
             if ($CascadeurRoot) { $cmdArgs.CascadeurRoot = $CascadeurRoot }
-            & (Join-Path $ScriptPath "install_cascadeur_command.ps1") @cmdArgs
+            & (Join-Path $ScriptPath "scripts\install_cascadeur_command.ps1") @cmdArgs
         }
     } catch {
         Write-Status "CLI ERROR: $_" "ERROR"

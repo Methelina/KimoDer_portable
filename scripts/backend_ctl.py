@@ -5,8 +5,8 @@ Start/stop/health for cascadeur_backend_service.
 Used both as CLI (python backend_ctl.py start|stop|health) and as an
 importable module by kimoder_gui.py.
 
-Version: 1.0.0
-Author:  Kilo
+Version: 1.0.1
+Author:  Soror L.'.L.'.
 """
 
 import argparse
@@ -20,6 +20,22 @@ from pathlib import Path
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 9552
+
+
+def hidden_flags() -> int:
+    if os.name != "nt":
+        return 0
+    return subprocess.CREATE_NO_WINDOW
+
+
+def detached_flags() -> int:
+    if os.name != "nt":
+        return 0
+    return (
+        subprocess.CREATE_NO_WINDOW
+        | subprocess.DETACHED_PROCESS
+        | subprocess.CREATE_NEW_PROCESS_GROUP
+    )
 
 
 def repo_root() -> Path:
@@ -194,21 +210,13 @@ def start(
     emit("Starting Kimodo backend...")
     log_file = open(log_path(), "w", encoding="utf-8", errors="replace")
 
-    flags = 0
-    if os.name == "nt":
-        flags = (
-            subprocess.CREATE_NO_WINDOW
-            | subprocess.DETACHED_PROCESS
-            | subprocess.CREATE_NEW_PROCESS_GROUP
-        )
-
     proc = subprocess.Popen(
         args,
         stdout=log_file,
         stderr=subprocess.STDOUT,
         cwd=str(repo_root()),
         env=env,
-        creationflags=flags,
+        creationflags=detached_flags(),
         close_fds=True,
     )
     pidfile.write_text(str(proc.pid))
@@ -262,6 +270,7 @@ def stop(port: int = DEFAULT_PORT, status_cb=None) -> int:
                     ["taskkill", "/PID", str(pid), "/F"],
                     capture_output=True,
                     timeout=10,
+                    creationflags=hidden_flags(),
                 )
             else:
                 os.kill(pid, 9)

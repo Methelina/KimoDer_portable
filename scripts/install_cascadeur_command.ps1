@@ -6,7 +6,7 @@
 $ErrorActionPreference = "Stop"
 
 if (-not $KimodoRoot) {
-    $KimodoRoot = $PSScriptRoot
+    $KimodoRoot = (Get-Item $PSScriptRoot).Parent.FullName
 }
 $KimodoRoot = (Resolve-Path $KimodoRoot).Path
 $SrcDir = Join-Path $KimodoRoot "integrations\cascadeur"
