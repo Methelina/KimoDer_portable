@@ -234,14 +234,22 @@ def bg():
         dpg.add_separator()
 
         # ---- Log ----
-        dpg.add_input_text(tag=LG,multiline=True,readonly=True,width=-1,height=220,tracked=True)
+        dpg.add_input_text(tag=LG,multiline=True,readonly=True,width=-1,height=-1,tracked=True)
     dpg.create_viewport(title="KimoDer -- Kimodo+Cascadeur Control",width=700,height=640)
     dpg.setup_dearpygui(); dpg.show_viewport(); dpg.set_primary_window("main_window",True)
 def co():
     global _owned; _sd.set()
-    if _owned:
-        try: bc.stop_demo(status_cb=lambda m:None)
-        except: pass
+    ct("GUI","Shutting down all KimoDer processes...")
+    try:
+        bc.stop_demo(status_cb=lambda m: ct("GUI",f"STATUS: {m}"))
+    except Exception: pass
+    try:
+        bc.stop(status_cb=lambda m: ct("GUI",f"STATUS: {m}"))
+    except Exception: pass
+    try:
+        bc.cleanup_env_processes(status_cb=lambda m: ct("GUI",f"STATUS: {m}"))
+    except Exception: pass
+    _owned=False
 def main():
     if not bc.is_installed(): print("[GUI] Environment not installed."); return 1
     ct("GUI","KimoDer GUI starting...")

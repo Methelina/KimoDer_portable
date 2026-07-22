@@ -395,6 +395,87 @@ def stop_demo(status_cb=None) -> int:
     return 0
 
 
+def cleanup_demo_zombies(status_cb=None) -> int:
+    """Kill python processes from our venv running kimodo.demo (leftover zombies).
+
+    Does NOT touch the backend (cascadeur_backend_service) or other python
+    processes outside our venv, and never kills the caller itself.
+    """
+    emit = status_cb or (lambda msg: print(f"STATUS: {msg}", flush=True))
+    try:
+        import psutil
+    except ImportError:
+        emit("psutil not available, cannot scan for zombies.")
+        return 1
+
+    venv_marker = str(repo_root() / "kimodo_env").lower()
+    self_pid = os.getpid()
+    killed = 0
+    for proc in psutil.process_iter(["pid", "name", "exe", "cmdline"]):
+        try:
+            info = proc.info
+            if info["pid"] == self_pid:
+                continue
+            name = (info.get("name") or "").lower()
+            if "python" not in name:
+                continue
+            exe = (info.get("exe") or "").lower()
+            if venv_marker not in exe:
+                continue
+            cmdline = " ".join(info.get("cmdline") or []).lower()
+            if "kimodo.demo" not in cmdline:
+                continue
+            emit(f"Killing zombie demo process PID {info['pid']}.")
+            proc.kill()
+            killed += 1
+        except Exception:
+            continue
+    demo_pid_path().unlink(missing_ok=True)
+    (runtime_dir() / "kimodo-demo.port").unlink(missing_ok=True)
+    emit(f"Zombie cleanup done, {killed} process(es) killed.")
+    return 0
+
+
+def cleanup_env_processes(status_cb=None) -> int:
+    """Kill ALL python processes from our kimodo_env venv (zombie sweep).
+
+    Used when the GUI exits: the user is done with the framework, so every
+    leftover python process from our environment (backends, demos, orphans)
+    must be terminated. Never kills the caller itself.
+    """
+    emit = status_cb or (lambda msg: print(f"STATUS: {msg}", flush=True))
+    try:
+        import psutil
+    except ImportError:
+        emit("psutil not available, cannot scan for zombies.")
+        return 1
+
+    venv_marker = str(repo_root() / "kimodo_env").lower()
+    self_pid = os.getpid()
+    killed = 0
+    for proc in psutil.process_iter(["pid", "name", "exe"]):
+        try:
+            info = proc.info
+            if info["pid"] == self_pid:
+                continue
+            name = (info.get("name") or "").lower()
+            if "python" not in name:
+                continue
+            exe = (info.get("exe") or "").lower()
+            if venv_marker not in exe:
+                continue
+            emit(f"Killing env zombie process PID {info['pid']}.")
+            proc.kill()
+            killed += 1
+        except Exception:
+            continue
+    pid_path().unlink(missing_ok=True)
+    demo_pid_path().unlink(missing_ok=True)
+    (runtime_dir() / "kimodo-demo.port").unlink(missing_ok=True)
+    emit(f"Env cleanup done, {killed} process(es) killed.")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="KimoDer backend control")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -420,6 +501,8 @@ def main() -> int:
     p_start_demo.add_argument("--watch", action="store_true")
 
     p_stop_demo = sub.add_parser("stop-demo")
+
+    sub.add_parser("cleanup")
 
     args = parser.parse_args()
 
@@ -458,6 +541,8 @@ def main() -> int:
         return 0
     if args.command == "stop-demo":
         return stop_demo()
+    if args.command == "cleanup":
+        return cleanup_demo_zombies()
     return 1
 
 
