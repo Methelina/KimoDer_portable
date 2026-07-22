@@ -77,14 +77,17 @@ def tf(fn,tg):
         except: pass
         _sd.wait(0.5)
 def hw():
-    w=False
+    was=False; fails=0
     while not _sd.is_set():
         s=bc.health()
         if s and s.get("ok"):
-            w=True; _q.put(("state",{"ok":True,"warming_up":bool(s.get("warming_up")),"busy":bool(s.get("busy")),"warmup_error":s.get("warmup_error") or "","device":s.get("device") or "-","text_encoder_profile":s.get("text_encoder_profile") or "-","loaded_datasets":s.get("loaded_datasets") or []}))
+            was=True
+            if fails>=3: ct("GUI","+ backend reachable")
+            fails=0; _q.put(("state",{"ok":True,"warming_up":bool(s.get("warming_up")),"busy":bool(s.get("busy")),"warmup_error":s.get("warmup_error") or "","device":s.get("device") or "-","text_encoder_profile":s.get("text_encoder_profile") or "-","loaded_datasets":s.get("loaded_datasets") or []}))
         else:
-            if w: ct("GUI","--- backend unreachable ---"); w=False
-            _q.put(("state",{"ok":False,"warming_up":False,"busy":False,"warmup_error":"","device":"-","text_encoder_profile":"-","loaded_datasets":[]}))
+            fails+=1
+            if was and fails==3: ct("GUI","* backend unreachable"); was=False
+            if fails>=3: _q.put(("state",{"ok":False,"warming_up":False,"busy":False,"warmup_error":"","device":"-","text_encoder_profile":"-","loaded_datasets":[]}))
         a,p,pt=bc.demo_status()
         dr=False
         if a and pt:
