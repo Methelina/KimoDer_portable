@@ -1000,6 +1000,25 @@ function Update-Repositories {
 }
 
 # ==========================================================
+# OFFER CASCADEUR COMMAND INSTALL (post-install)
+# ==========================================================
+function Offer-CascadeurCommandInstall {
+    $CmdInstaller = Join-Path $ScriptPath "scripts\install_cascadeur_command.ps1"
+    if (-not (Test-Path $CmdInstaller)) {
+        Write-Status "install_cascadeur_command.ps1 not found. Skipping." "WARN"
+        return
+    }
+    Write-Host ""
+    Write-Status "Environment installed. The Cascadeur plugin lets Cascadeur talk to Kimodo." "INFO"
+    $answer = Read-Host "Install Cascadeur Command now? (Y/n)"
+    if ($answer -eq "" -or $answer -eq "y" -or $answer -eq "Y") {
+        & $CmdInstaller
+    } else {
+        Write-Status "Deferred. You can install it later from the installer menu (item 3)." "INFO"
+    }
+}
+
+# ==========================================================
 # FORCE PATCH APPLICATION (before launch)
 # ==========================================================
 function Ensure-PatchesApplied {
@@ -1147,11 +1166,13 @@ if (-not $Menu) {
             Write-Status "CLI: full install..." "INFO"
             Install-Kimodo -Reinstall $false
             if (-not (Test-IsInstalled)) { throw "Installation failed." }
+            if (-not $InstallCascadeurCommand) { Offer-CascadeurCommandInstall }
         }
         if ($Reinstall) {
             Write-Status "CLI: reinstall..." "INFO"
             Install-Kimodo -Reinstall $true
             if (-not (Test-IsInstalled)) { throw "Reinstall failed." }
+            if (-not $InstallCascadeurCommand) { Offer-CascadeurCommandInstall }
         }
         if ($InstallCascadeurCommand) {
             $cmdArgs = @{}
@@ -1173,9 +1194,11 @@ do {
             if (-not $installed) {
                 Write-Status "Starting installation..." "INFO"
                 Install-Kimodo -Reinstall $false
+                if (Test-IsInstalled) { Offer-CascadeurCommandInstall }
             } else {
                 Write-Status "Starting reinstall..." "INFO"
                 Install-Kimodo -Reinstall $true
+                if (Test-IsInstalled) { Offer-CascadeurCommandInstall }
             }
         }
         "2" {
