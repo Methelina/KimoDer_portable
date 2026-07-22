@@ -158,7 +158,7 @@ def bg():
     dpg.bind_theme(gt)
     with dpg.window(tag="main_window",label="KimoDer Control",autosize=True,no_resize=False,no_collapse=True):
         with dpg.group(horizontal=True):
-            dpg.add_text("KimoDer v2.0.0",color=(140,160,220))
+            dpg.add_text("KimoDer v2.2.0",color=(140,160,220))
             dpg.add_text("  |  by Soror L.'. L.'.",color=(110,115,125))
         dpg.add_separator()
         with dpg.group(horizontal=True):
@@ -168,7 +168,7 @@ def bg():
         dpg.add_text("device: -",tag=IT)
         dpg.add_text("VRAM -",tag=VT); dpg.add_text("RAM -",tag=RT)
         dpg.add_separator()
-        dpg.add_text("Backend (port 9552):",color=(140,145,155))
+        dpg.add_text("Cascadeur Backend (port 9552):",color=(140,160,220))
         with dpg.group(horizontal=True):
             dpg.add_button(label="Start (LLAMA NF4)",tag="btn_start_nf4",callback=lambda:sb("llama"))
             dpg.add_button(label="Start (LLAMA OFF)",tag="btn_start_off",callback=lambda:sb("fallback"))
