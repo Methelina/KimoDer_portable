@@ -16,9 +16,10 @@ One-click portable installer for [Kimodo](https://github.com/NVlabs/kimodo) moti
 
 Two-section layout with per-service status indicators:
 
-- **Cascadeur BackEnd** (port 9552) — colored circle indicator (gray=down, yellow=warming, green=ready, blue=busy, red=error), Start/Stop buttons for LLAMA NF4 and LLAMA OFF modes
+- **Cascadeur BackEnd** (port 9552) — colored circle indicator (gray=down, yellow=warming, green=ready, blue=busy, red=error), Start/Stop buttons for LLAMA NF4 and LLAMA OFF modes, Cascadeur link display
 - **Kimodo Viser** — colored circle indicator (gray=stopped, yellow=loading, green=ready), Start/Stop Viser buttons, Log Folder
-- **Live log** — all service output flows to the GUI log area and the console with `[Cascadeur BackEnd]`, `[Kimodo Viser]`, `[GUI]` tags and type symbols (! * + . >)
+- **Live log** — console + GUI log area with adaptive word wrap, service tags `[Cascadeur BackEnd]`, `[Kimodo Viser]`, `[GUI]` and type symbols (`!` error, `*` warn, `+` ok, `.` status, `>` action). Log re-wraps dynamically on window resize.
+- **Process discipline** — closing the GUI triggers a graceful shutdown: stops demo, stops backend, sweeps all zombie Python processes from the venv
 
 ## CLI Reference
 
@@ -53,28 +54,36 @@ Two-section layout with per-service status indicators:
 3. Start the backend (GUI button or `-StartBackend`)
 4. In Cascadeur: **Animation Scripts → Kimodo Roundtrip**
 
-If you move the Repository folder, rerun `install_cascadeur_command.ps1` from the `scripts/` folder to update paths.
+If you move the Repository folder, rerun `scripts\install_cascadeur_command.ps1` to update paths.
+
+## Model Stack
+
+- **Diffusion:** `nvidia/Kimodo-SOMA-RP-v1` (SOMA-77, Retargeting Preset), SEED variant available via dataset selector
+- **Text encoder:** `Aero-Ex/KIMODO-Meta3_llm2vec_NF4` (merged 4-bit NF4) — in-process with memory manager offload; optional `HashTextEncoder` fallback (LLAMA OFF mode, ~0 VRAM)
+- **Skeleton:** SOMA-77 (Cascadeur SOMA rig)
+- Custom checkpoints supported via `CHECKPOINT_DIR` environment variable
 
 ## Structure
 
 ```
 Repository/
-├── Install_KimoDer-UV.ps1         # AIO installer (env + models + hybrid)
-├── Run_KimoDer.ps1                # GUI launcher / runtime CLI
-├── _hf_pycurl_download.py         # HF model downloader (pycurl)
+├── Install_KimoDer-UV.ps1       # AIO installer (env + models + hybrid)
+├── Run_KimoDer.ps1              # GUI launcher / runtime CLI
+├── _hf_pycurl_download.py       # HF model downloader (pycurl)
 ├── _llm2vec_wrapper_template.py
-├── bin/uv.exe, bin/uvx.exe        # uv package manager
-├── integrations/cascadeur/        # Cascadeur plugin files
-├── kimodo_addons/                 # Merged into kimodo/ during install
+├── bin/uv.exe, bin/uvx.exe      # uv package manager
+│   └── res/                     # ModeSeven fonts
+├── integrations/cascadeur/      # Cascadeur plugin files
+├── kimodo_addons/               # Merged into kimodo/ during install
 ├── scripts/
-│   ├── kimoder_gui.py             # DearPyGui control panel
-│   ├── backend_ctl.py             # Backend + demo lifecycle (CLI + module)
+│   ├── kimoder_gui.py           # DearPyGui control panel
+│   ├── backend_ctl.py           # Backend + demo lifecycle (CLI + module)
 │   ├── install_cascadeur_command.ps1  # copies plugin into Cascadeur
 │   └── cascadeur_backend_service.py   # HTTP backend (port 9552)
-└── tools/io_scene_fbx/            # Blender FBX addon modules (Python-only)
+└── tools/io_scene_fbx/          # Blender FBX addon modules (Python-only)
 ```
 
 ## Credits
 
 - Kimodo: [NVIDIA Research](https://research.nvidia.com/labs/sil/projects/kimodo/)
-- Portable launcher & Cascadeur integration: Soror L.'.L.'.
+- Portable launcher & Cascadeur integration: [Soror L.'.L.'.](https://github.com/Methelina/KimoDer_portable)

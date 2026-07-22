@@ -13,6 +13,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent; sys.path.insert(0, str(SCRIPT_DIR)
 import backend_ctl as bc
 import dearpygui.dearpygui as dpg
 SC="status_circle"; ST="status_text"; DC="demo_circle"; DST="demo_text"; IT="backend_info"; VT="vram_text"; RT="ram_text"; DT="demo_status"; LG="log_area"; LK="cascadeur_link"
+SH="sect_backend"; DH="sect_viser"
 _q=queue.Queue(); _sd=threading.Event()
 _st={"ok":False,"warming_up":False,"busy":False,"warmup_error":"","device":"-","text_encoder_profile":"-","loaded_datasets":[],"clients":{}}
 _ds={"running":False,"pid":0,"port":0,"ready":False}; _owned=False; _logbuf=[]; LB=8000
@@ -191,10 +192,26 @@ def bg():
             dpg.add_theme_style(dpg.mvStyleVar_FrameRounding,4)
             dpg.add_theme_style(dpg.mvStyleVar_WindowRounding,6)
     dpg.bind_theme(gt)
+    # Load ModeSeven bitmap fonts
+    fonts_ok=False
+    try:
+        font_dir=bc.repo_root()/"bin"/"res"
+        reg=font_dir/"ModeSevenBETAVHS.ttf"
+        cap=font_dir/"ModeSevenBETAVHS20212.ttf"
+        if reg.is_file() and cap.is_file():
+            with dpg.font_registry():
+                with dpg.font(str(reg),16,tag="font_regular"):
+                    dpg.add_font_range_hint(dpg.mvFontRangeHint_Cyrillic)
+                with dpg.font(str(cap),16,tag="font_caps"):
+                    dpg.add_font_range_hint(dpg.mvFontRangeHint_Default)
+            dpg.bind_font("font_regular")
+            fonts_ok=True
+    except Exception: pass
     with dpg.window(tag="main_window",label="KimoDer Control",autosize=True,no_resize=False,no_collapse=True):
         with dpg.group(horizontal=True):
-            dpg.add_text("KimoDer v2.3.0",color=(255,200,100))
+            dpg.add_text("KimoDer v2.3.0",tag="ver_text",color=(255,200,100))
             dpg.add_text("  |  by Soror L.'. L.'.",color=(140,145,155))
+            dpg.add_button(label="github",small=True,callback=lambda:webbrowser.open("https://github.com/Methelina/KimoDer_portable"))
             dpg.add_text("    ")
             dpg.add_text("VRAM -",tag=VT,color=(180,185,195))
             dpg.add_text("RAM -",tag=RT,color=(180,185,195))
@@ -205,7 +222,7 @@ def bg():
         with dpg.group(horizontal=True):
             with dpg.drawlist(width=20,height=20):
                 dpg.draw_circle(center=(10,10),radius=7,tag=SC,fill=(110,110,110))
-            dpg.add_text("Cascadeur Backend  (port 9552)",color=(255,200,100))
+            dpg.add_text("Cascadeur Backend  (port 9552)",tag=SH,color=(255,200,100))
             dpg.add_text("  ")
             dpg.add_text("DOWN",tag=ST,color=(110,110,110))
         dpg.add_text("device: -",tag=IT,color=(160,165,175),indent=24)
@@ -222,7 +239,7 @@ def bg():
         with dpg.group(horizontal=True):
             with dpg.drawlist(width=20,height=20):
                 dpg.draw_circle(center=(10,10),radius=7,tag=DC,fill=(110,110,110))
-            dpg.add_text("Kimodo Viser",color=(255,200,100))
+            dpg.add_text("Kimodo Viser",tag=DH,color=(255,200,100))
             dpg.add_text("  ")
             dpg.add_text("STOPPED",tag=DST,color=(110,110,110))
         with dpg.group(indent=24):
@@ -236,6 +253,8 @@ def bg():
         # ---- Log ----
         dpg.add_input_text(tag=LG,multiline=True,readonly=True,width=-1,height=-1,tracked=True)
     dpg.create_viewport(title="KimoDer -- Kimodo+Cascadeur Control",width=700,height=640)
+    if fonts_ok:
+        for t in (SH,DH,"ver_text"): dpg.bind_item_font(t,"font_caps")
     dpg.setup_dearpygui(); dpg.show_viewport(); dpg.set_primary_window("main_window",True)
 def co():
     global _owned; _sd.set()
