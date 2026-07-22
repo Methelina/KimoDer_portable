@@ -111,6 +111,10 @@ KimoDer объединяет две независимые технологии 
 
 ![Roundtrip в действии из Cascadeur](bin/res/cascadeur_animationen.gif)
 
+**Видео-прохождение** (клик открывает на YouTube):
+
+[![Демо KimoDer](https://img.youtube.com/vi/Q4Bp6asB6Bw/0.jpg)](https://youtu.be/Q4Bp6asB6Bw)
+
 Если папка Repository была перемещена, перезапустите `scripts\install_cascadeur_command.ps1` для обновления путей.
 
 ## Модельный стек

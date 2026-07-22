@@ -112,6 +112,10 @@ Two-section layout with per-service status indicators, plus a live system load b
 
 ![Cascadeur roundtrip in action](bin/res/cascadeur_animationen.gif)
 
+**Video walkthrough** (click to play on YouTube):
+
+[![KimoDer demo](https://img.youtube.com/vi/Q4Bp6asB6Bw/0.jpg)](https://youtu.be/Q4Bp6asB6Bw)
+
 If you move the Repository folder, rerun `scripts\install_cascadeur_command.ps1` to update paths.
 
 ## Model Stack
