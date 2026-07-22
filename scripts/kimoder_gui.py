@@ -256,20 +256,41 @@ def _open_demo():
             if not kimodo_dir.is_dir():
                 log_line("kimodo folder not found.", (235, 110, 110))
                 return
+            demo_port = bc.find_free_port()
+            demo_log = bc.runtime_dir() / "kimodo-demo.log"
             env = bc.build_env("llama")
-            log_file = open(bc.runtime_dir() / "kimodo-demo.log", "w", encoding="utf-8", errors="replace")
+            env["SERVER_PORT"] = str(demo_port)
+            log_file = open(demo_log, "w", encoding="utf-8", errors="replace")
             subprocess.Popen(
                 [str(bc.python_exe()), "-m", "kimodo.demo"],
                 cwd=str(kimodo_dir),
                 env=env,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
                 creationflags=bc.detached_flags(),
                 close_fds=True,
             )
-            log_line("Demo starting on http://127.0.0.1:7860 ...", (130, 230, 140))
-            time.sleep(5)
-            webbrowser.open("http://127.0.0.1:7860")
+            log_line(f"Demo starting on port {demo_port} (model load takes 1-2 min)...", (130, 230, 140))
+
+            url = f"http://127.0.0.1:{demo_port}"
+            deadline = time.time() + 240
+            while time.time() < deadline:
+                try:
+                    import urllib.request
+
+                    with urllib.request.urlopen(url, timeout=2) as resp:
+                        if resp.status == 200:
+                            break
+                except Exception:
+                    pass
+                time.sleep(2)
+            else:
+                log_line(f"Demo did not respond on {url} within 240s. Check kimodo-demo.log.", (235, 110, 110))
+                return
+
+            log_line(f"Demo ready at {url}", (130, 230, 140))
+            webbrowser.open(url)
         except Exception as exc:
             log_line(f"Demo launch failed: {exc}", (235, 110, 110))
 

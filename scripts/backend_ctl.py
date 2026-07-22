@@ -12,6 +12,7 @@ Author:  Soror L.'.L.'.
 import argparse
 import json
 import os
+import socket
 import subprocess
 import sys
 import time
@@ -20,6 +21,7 @@ from pathlib import Path
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 9552
+PORT_SCAN_START = 8389
 
 
 def hidden_flags() -> int:
@@ -35,6 +37,20 @@ def detached_flags() -> int:
         subprocess.CREATE_NO_WINDOW
         | subprocess.DETACHED_PROCESS
         | subprocess.CREATE_NEW_PROCESS_GROUP
+    )
+
+
+def find_free_port(preferred: int = PORT_SCAN_START, max_tries: int = 200) -> int:
+    for offset in range(max_tries):
+        candidate = preferred + offset
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            try:
+                sock.bind((HOST, candidate))
+                return candidate
+            except OSError:
+                continue
+    raise RuntimeError(
+        f"No free port found in range {preferred}-{preferred + max_tries}"
     )
 
 

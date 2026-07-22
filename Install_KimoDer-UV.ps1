@@ -970,37 +970,14 @@ function Install-Kimodo {
     if (Test-Path $LoadModelPath) {
         $content = Get-Content $LoadModelPath -Raw
         if ($content -notmatch '"hash"\s*:') {
-            $oldBlock = 'TEXT_ENCODER_PRESETS = {
-    "llm2vec": {
-        "target": "kimodo.model.LLM2VecEncoder",
-        "kwargs": {
-            "base_model_name_or_path": "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp",
-            "peft_model_name_or_path": "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised",
-            "dtype": "bfloat16",
-            "llm_dim": 4096,
-        },
-    }
-}'
-            $newBlock = 'TEXT_ENCODER_PRESETS = {
-    "llm2vec": {
-        "target": "kimodo.model.LLM2VecEncoder",
-        "kwargs": {
-            "base_model_name_or_path": "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp",
-            "peft_model_name_or_path": "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised",
-            "dtype": "bfloat16",
-            "llm_dim": 4096,
-        },
-    },
-    "hash": {
-        "target": "kimodo.model.hash_text_encoder.HashTextEncoder",
-        "kwargs": {
-            "llm_dim": 4096,
-        },
-    }
-}'
-            $content = $content -replace [regex]::Escape($oldBlock), $newBlock
-            $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
-            [System.IO.File]::WriteAllText($LoadModelPath, $content, $Utf8NoBom)
+            $hashEntry = 'TEXT_ENCODER_PRESETS = {' + "`n" + '    "hash": {' + "`n" + '        "target": "kimodo.model.hash_text_encoder.HashTextEncoder",' + "`n" + '        "kwargs": {' + "`n" + '            "llm_dim": 4096,' + "`n" + '        },' + "`n" + '    },'
+            $patched = $content -replace '(?m)^TEXT_ENCODER_PRESETS\s*=\s*\{\s*$', $hashEntry
+            if ($patched -ne $content) {
+                $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
+                [System.IO.File]::WriteAllText($LoadModelPath, $patched, $Utf8NoBom)
+            } else {
+                Write-Status "  Could not locate TEXT_ENCODER_PRESETS block. Hash preset NOT registered." "WARN"
+            }
         }
     }
 
@@ -1119,6 +1096,50 @@ function Ensure-PatchesApplied {
     $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
     [System.IO.File]::WriteAllText($WrapperDest, $newContent, $Utf8NoBom)
     Write-Status "Wrapper successfully updated. Path: $correctPath" "SUCCESS"
+
+    # playback.py patch (idempotent, self-healing after git pull)
+    $playbackFile = Join-Path $KimodoDir "kimodo\viz\playback.py"
+    if (Test-Path $playbackFile) {
+        $pb = Get-Content $playbackFile -Raw
+        $pbOld = "self.skeleton.neutral_joints[[self.skeleton.root_idx]]"
+        $pbNew = "self.skeleton.neutral_joints[[self.skeleton.root_idx]].to(new_posed_joints.device)"
+        if (($pb -match [regex]::Escape($pbOld)) -and ($pb -notmatch [regex]::Escape($pbNew))) {
+            $pb = $pb -replace [regex]::Escape($pbOld), $pbNew
+            [System.IO.File]::WriteAllText($playbackFile, $pb, $Utf8NoBom)
+            Write-Status "playback.py patched." "SUCCESS"
+        }
+    }
+
+    # hash encoder preset in load_model.py (idempotent, self-healing after git pull)
+    $LoadModelPath = Join-Path $KimodoDir "kimodo\model\load_model.py"
+    if (Test-Path $LoadModelPath) {
+        $lm = Get-Content $LoadModelPath -Raw
+        if ($lm -notmatch '"hash"\s*:') {
+            $hashEntry = 'TEXT_ENCODER_PRESETS = {' + "`n" + '    "hash": {' + "`n" + '        "target": "kimodo.model.hash_text_encoder.HashTextEncoder",' + "`n" + '        "kwargs": {' + "`n" + '            "llm_dim": 4096,' + "`n" + '        },' + "`n" + '    },'
+            $lmPatched = $lm -replace '(?m)^TEXT_ENCODER_PRESETS\s*=\s*\{\s*$', $hashEntry
+            if ($lmPatched -ne $lm) {
+                [System.IO.File]::WriteAllText($LoadModelPath, $lmPatched, $Utf8NoBom)
+                Write-Status "Hash encoder preset registered." "SUCCESS"
+            }
+        }
+    }
+
+    # hybrid addon files (idempotent re-copy after git pull)
+    $AddonsSrc = Join-Path $ScriptPath "kimodo_addons"
+    $KimodoPkg = Join-Path $KimodoDir "kimodo"
+    if (Test-Path $AddonsSrc) {
+        if (-not (Test-Path (Join-Path $KimodoPkg "exports\fbx.py"))) {
+            Copy-Item -Path (Join-Path $AddonsSrc "exports\fbx.py") -Destination (Join-Path $KimodoPkg "exports\fbx.py") -Force -ErrorAction SilentlyContinue
+            Copy-Item -Path (Join-Path $AddonsSrc "exports\blender_fbx_export.py") -Destination (Join-Path $KimodoPkg "exports\blender_fbx_export.py") -Force -ErrorAction SilentlyContinue
+            $FbxDst = Join-Path $KimodoPkg "assets\fbx"
+            New-Item -ItemType Directory -Force -Path $FbxDst | Out-Null
+            Copy-Item -Path (Join-Path $AddonsSrc "assets\fbx\*") -Destination $FbxDst -Force -ErrorAction SilentlyContinue
+        }
+        if (-not (Test-Path (Join-Path $KimodoPkg "model\hash_text_encoder.py"))) {
+            Copy-Item -Path (Join-Path $AddonsSrc "model\hash_text_encoder.py") -Destination (Join-Path $KimodoPkg "model\hash_text_encoder.py") -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     return $true
 }
 
