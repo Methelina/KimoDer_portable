@@ -17,15 +17,15 @@ _q=queue.Queue(); _sd=threading.Event()
 _st={"ok":False,"warming_up":False,"busy":False,"warmup_error":"","device":"-","text_encoder_profile":"-","loaded_datasets":[]}
 _ds={"running":False,"pid":0,"port":0,"ready":False}; _owned=False; _logbuf=[]; LB=8000
 def ct(t,g):
-    us=g.upper()
-    if "ERROR" in us or "TRACEBACK" in us or "FAIL" in us: sym,ux, lvl="! ","✗ ","[ERROR] "
-    elif "WARN" in us: sym,ux,lvl="* ","⚠ ","[WARN]  "
-    elif "READY" in us or "loaded" in g or "OK" in g[:4]: sym,ux,lvl="+ ","✓ ","[OK]    "
-    elif ">>>" in g[:4]: sym,ux,lvl="> ","→ ",""
-    elif "STATUS" in us[:10]: sym,ux,lvl=". ","● ","[STATUS]"
-    else: sym,ux,lvl="  ","  ","       "
-    print(f"[{t:19s}] {sym} {lvl}  {g}",flush=True)
-    _q.put(("log",f"[{t:19s}] {ux} {g}"))
+    u=g.upper(); sym=" "
+    if "ERROR" in u or "TRACEBACK" in u or "FAIL" in u: sym="!"
+    elif "WARN" in u: sym="*"
+    elif "READY" in u or "loaded" in g or "OK" in g[:4]: sym="+"
+    elif ">>>" in g[:4]: sym=">"
+    elif "STATUS" in u[:10]: sym="."
+    line=f"[{t:19s}] {sym} {g}"
+    print(line,flush=True)
+    _q.put(("log",line))
 def sc(): return ((230,70,70),"ERROR") if _st["warmup_error"] else ((110,110,110),"DOWN") if not _st["ok"] else ((240,200,60),"WARMING") if _st["warming_up"] else ((90,160,250),"BUSY") if _st["busy"] else ((80,210,100),"READY")
 def ap():
     c,l=sc()
@@ -72,7 +72,7 @@ def tf(fn,tg):
                     with open(lp,"r",encoding="utf-8",errors="replace") as f: f.seek(off); ck=f.read()
                     off=lp.stat().st_size
                     for ln in ck.splitlines():
-                        ln=ln.rstrip()
+                        ln=ln.strip('\x00').rstrip()
                         if ln: ct(tg,ln)
         except: pass
         _sd.wait(0.5)
