@@ -868,6 +868,19 @@ function Install-Kimodo {
         }
     }
 
+    # ---- 8b. Download Kimodo-SOMA-RP-v1 diffusion model ----
+    Write-Status "Downloading Kimodo-SOMA-RP-v1 model (~1.1GB)..." "INFO"
+    $SomaModelDir = Join-Path $HfCacheDir "hub"
+    $downloadOk = Invoke-WithRetry -Script {
+        & $PythonExePath -c "from huggingface_hub import snapshot_download; print(snapshot_download('nvidia/Kimodo-SOMA-RP-v1'))"
+        if ($LASTEXITCODE -ne 0) { throw "SOMA model download failed" }
+    }
+    if ($downloadOk) {
+        Write-Status "Kimodo-SOMA-RP-v1 downloaded." "SUCCESS"
+    } else {
+        Write-Status "Failed to download SOMA model. Backend will download it on first start." "WARN"
+    }
+
     # ---- 9. Apply patches ----
     Write-Status "Applying patches..." "INFO"
     $WrapperTemplate = Join-Path $ScriptPath "_llm2vec_wrapper_template.py"
