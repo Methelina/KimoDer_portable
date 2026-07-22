@@ -65,6 +65,8 @@ KimoDer объединяет две независимые технологии 
 
 ## Панель управления (GUI)
 
+![GUI KimoDer с запущенными бэкендом и визером](bin/res/pintura_001.png)
+
 Две секции с индикаторами состояния для каждого сервиса, плюс строка системной нагрузки:
 
 - **Строка нагрузки** — `GPU <%> VRAM: X/YGb || RAM <%> X/YGb`, оранжевые метки GPU/RAM, обновление каждые 3 с
@@ -106,6 +108,8 @@ KimoDer объединяет две независимые технологии 
 2. После установки среды установщик **предложит установить Cascadeur Command сразу** (Y/n) — согласитесь, или отложите и запустите позже через пункт 3 меню установщика (`Install Cascadeur Command`)
 3. Запустите GUI (`.\Run_KimoDer.ps1`) и нажмите **Start (LLAMA NF4)**
 4. В Cascadeur: **Animation Scripts → Kimodo Roundtrip**
+
+![Roundtrip в действии из Cascadeur](bin/res/cascadeur_animationen.gif)
 
 Если папка Repository была перемещена, перезапустите `scripts\install_cascadeur_command.ps1` для обновления путей.
 

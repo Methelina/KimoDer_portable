@@ -66,6 +66,8 @@ All of this runs inside a single portable folder. No Docker, no WSL, no cloud GP
 
 ## GUI Control Panel
 
+![KimoDer GUI with backend and Viser running](bin/res/pintura_001.png)
+
 Two-section layout with per-service status indicators, plus a live system load bar:
 
 - **Status bar** — `GPU <%> VRAM: X/YGb || RAM <%> X/YGb`, orange GPU/RAM labels, refreshed every 3 s
@@ -107,6 +109,8 @@ Two-section layout with per-service status indicators, plus a live system load b
 2. After environment install, the installer **offers to install the Cascadeur Command right away** (Y/n) — accept, or defer and run it later via installer menu item 3 (`Install Cascadeur Command`)
 3. Launch the GUI (`.\Run_KimoDer.ps1`) and press **Start (LLAMA NF4)**
 4. In Cascadeur: **Animation Scripts → Kimodo Roundtrip**
+
+![Cascadeur roundtrip in action](bin/res/cascadeur_animationen.gif)
 
 If you move the Repository folder, rerun `scripts\install_cascadeur_command.ps1` to update paths.
 
