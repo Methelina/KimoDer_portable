@@ -34,10 +34,10 @@ def ap():
         elif _ds.get("ready"): dc,dl=(80,210,100),"READY"
         elif _ds["running"]: dc,dl=(240,200,60),"LOADING"
         else: dc,dl=(110,110,110),"STOPPED"
-        dpg.set_value(DC,"●"); dpg.configure_item(DC,color=dc)
+        dpg.configure_item(DC,fill=dc)
         if dpg.does_item_exist(DST): dpg.set_value(DST,dl); dpg.configure_item(DST,color=dc)
     if dpg.does_item_exist(DT):
-        if _ds["running"]: dpg.set_value(DT,f"  port :{_ds['port']} (pid {_ds['pid']})")
+        if _ds["running"]: dpg.set_value(DT,f"port :{_ds['port']}  pid {_ds['pid']}")
         else: dpg.set_value(DT,"")
     if dpg.does_item_exist("btn_demo_stop"): dpg.configure_item("btn_demo_stop",enabled=_ds["running"])
 def dq():
@@ -146,45 +146,60 @@ def bg():
     dpg.create_context()
     with dpg.theme() as gt:
         with dpg.theme_component(dpg.mvAll):
-            dpg.add_theme_color(dpg.mvThemeCol_WindowBg,(24,26,30))
+            dpg.add_theme_color(dpg.mvThemeCol_WindowBg,(25,25,35))
             dpg.add_theme_color(dpg.mvThemeCol_ChildBg,(20,22,26))
-            dpg.add_theme_color(dpg.mvThemeCol_Button,(45,60,90))
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered,(60,80,120))
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive,(75,100,150))
-            dpg.add_theme_color(dpg.mvThemeCol_FrameBg,(35,38,45))
-            dpg.add_theme_color(dpg.mvThemeCol_Text,(215,218,224))
-            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding,5)
-            dpg.add_theme_style(dpg.mvStyleVar_WindowRounding,8)
+            dpg.add_theme_color(dpg.mvThemeCol_Button,(45,55,70))
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered,(65,80,100))
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive,(85,100,120))
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBg,(40,42,50))
+            dpg.add_theme_color(dpg.mvThemeCol_Text,(220,220,220))
+            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding,4)
+            dpg.add_theme_style(dpg.mvStyleVar_WindowRounding,6)
     dpg.bind_theme(gt)
     with dpg.window(tag="main_window",label="KimoDer Control",autosize=True,no_resize=False,no_collapse=True):
         with dpg.group(horizontal=True):
-            dpg.add_text("KimoDer v2.2.0",color=(140,160,220))
-            dpg.add_text("  |  by Soror L.'. L.'.",color=(110,115,125))
+            dpg.add_text("KimoDer v2.3.0",color=(255,200,100))
+            dpg.add_text("  |  by Soror L.'. L.'.",color=(140,145,155))
+            dpg.add_text("    ")
+            dpg.add_text("VRAM -",tag=VT,color=(180,185,195))
+            dpg.add_text("RAM -",tag=RT,color=(180,185,195))
         dpg.add_separator()
+
+        # ---- Cascadeur Backend ----
+        dpg.add_spacer(height=4)
         with dpg.group(horizontal=True):
-            with dpg.drawlist(width=26,height=26):
-                dpg.draw_circle(center=(13,13),radius=9,tag=SC,fill=(110,110,110),color=(0,0,0,0))
+            with dpg.drawlist(width=20,height=20):
+                dpg.draw_circle(center=(10,10),radius=7,tag=SC,fill=(110,110,110))
+            dpg.add_text("Cascadeur Backend  (port 9552)",color=(255,200,100))
+            dpg.add_text("  ")
             dpg.add_text("DOWN",tag=ST,color=(110,110,110))
-        dpg.add_text("device: -",tag=IT)
-        dpg.add_text("VRAM -",tag=VT); dpg.add_text("RAM -",tag=RT)
-        dpg.add_separator()
-        dpg.add_text("Cascadeur Backend (port 9552):",color=(140,160,220))
-        with dpg.group(horizontal=True):
+        dpg.add_text("device: -",tag=IT,color=(160,165,175),indent=24)
+        dpg.add_spacer(height=2)
+        with dpg.group(indent=24):
             dpg.add_button(label="Start (LLAMA NF4)",tag="btn_start_nf4",callback=lambda:sb("llama"))
             dpg.add_button(label="Start (LLAMA OFF)",tag="btn_start_off",callback=lambda:sb("fallback"))
             dpg.add_button(label="Stop Backend",tag="btn_stop",callback=stb)
         dpg.add_separator()
+
+        # ---- Kimodo Viser ----
+        dpg.add_spacer(height=4)
         with dpg.group(horizontal=True):
-            dpg.add_text("●  ",tag=DC,color=(110,110,110))
+            with dpg.drawlist(width=20,height=20):
+                dpg.draw_circle(center=(10,10),radius=7,tag=DC,fill=(110,110,110))
+            dpg.add_text("Kimodo Viser",color=(255,200,100))
+            dpg.add_text("  ")
             dpg.add_text("STOPPED",tag=DST,color=(110,110,110))
-            dpg.add_text("",tag=DT)
-        with dpg.group(horizontal=True):
+        with dpg.group(indent=24):
+            dpg.add_text("",tag=DT,color=(160,165,175))
+        with dpg.group(indent=24):
             dpg.add_button(label="Start Viser",tag="btn_demo_start",callback=sdm)
             dpg.add_button(label="Stop Viser",tag="btn_demo_stop",callback=spd)
             dpg.add_button(label="Log Folder",callback=olf)
         dpg.add_separator()
-        dpg.add_input_text(tag=LG,multiline=True,readonly=True,width=-1,height=260,tracked=True)
-    dpg.create_viewport(title="KimoDer -- Kimodo+Cascadeur Control",width=700,height=720)
+
+        # ---- Log ----
+        dpg.add_input_text(tag=LG,multiline=True,readonly=True,width=-1,height=220,tracked=True)
+    dpg.create_viewport(title="KimoDer -- Kimodo+Cascadeur Control",width=700,height=640)
     dpg.setup_dearpygui(); dpg.show_viewport(); dpg.set_primary_window("main_window",True)
 def co():
     global _owned; _sd.set()
