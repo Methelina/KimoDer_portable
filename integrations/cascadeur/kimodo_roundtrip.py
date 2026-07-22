@@ -1789,7 +1789,8 @@ def _run_kimodo_generation(config, settings, constraints_path, output_path, outp
             last_progress = progress
         if job.get("done"):
             if job.get("error"):
-                raise RuntimeError(f"Kimodo headless generation failed. See log: {log_path}")
+                job_error = str(job.get("error")).strip()
+                raise RuntimeError(f"Kimodo generation failed: {job_error}\nSee log: {log_path}")
             break
         time.sleep(0.25)
 
