@@ -2,6 +2,57 @@
 
 One-click portable installer for [Kimodo](https://github.com/NVlabs/kimodo) motion diffusion model with Cascadeur integration. **No Docker, no WSL, no cloud.** Runs entirely from a single folder.
 
+## What is KimoDer?
+
+KimoDer combines two independent technologies into a single portable pipeline:
+
+| Component | What it does |
+|-----------|-------------|
+| **[Kimodo](https://github.com/NVlabs/kimodo)** | NVIDIA's motion diffusion model. Takes a text description ("a person jumps over an obstacle") and generates a full-body skeleton animation. Runs on a local GPU, no cloud. |
+| **[Cascadeur](https://cascadeur.com/)** | Professional 3D character animation software with physics-assisted posing and a Python scripting API. Industry-standard tool for keyframe animation. **Not included in the package** — you must download it separately. |
+
+### Why combine them?
+
+- **Kimodo alone** produces an FBX file — but you can't see it in context or edit it without leaving the toolchain.
+- **Cascadeur alone** is great for manual animation but has no AI motion generation.
+
+With KimoDer, you type a prompt, click "Generate", and the animation appears **directly on the Cascadeur timeline** on a SOMA-77 skeleton — ready to tweak, retarget, or export.
+
+> **Important:** you must first **select a time range between two keyframes** on the Cascadeur timeline — otherwise inference won't start. The script generates motion to fill the selected interval.
+
+### Requirements
+
+- **Cascadeur 2026+** — skeleton compatibility between Kimodo and Cascadeur depends on the SOMA-77 rig introduced in Cascadeur 2024, and full roundtrip support requires 2026+.
+- **Paid version** — the free edition of Cascadeur **does not include retargeting**, so the Kimodo Roundtrip script will not work. Pro or Business license required.
+
+### How it's used in projects
+
+| Use case | Flow |
+|----------|------|
+| **Game prototyping** | Describe an NPC action ("idle, looking around") → select time range on timeline → generate → adjust timing in Cascadeur → export FBX to the engine |
+| **Film / VFX previz** | Generate a rough take from text in seconds, then refine with Cascadeur's keyframe tools |
+| **Indie animation** | No mocap suit required — type the motion you need, get a physically plausible starting point, polish it manually |
+| **Iteration loop** | Generate → edit in Cascadeur → feed back for another diffusion pass (constraint-guided) |
+
+### How the pipeline works
+
+```
+Text prompt ——> Kimodo diffusion model ——> skeleton animation
+                   ↑                              ↓
+              LLAMA text encoder          Cascadeur BackEnd
+              (text → embedding)          (HTTP server, port 9552)
+                                                  ↓
+                                            Cascadeur plugin
+                                          (Kimodo Roundtrip)
+                                                  ↓
+                                       [1] Select timeline range
+                                       [2] Click Generate
+                                                  ↓
+                                    Editable animation in Cascadeur
+```
+
+All of this runs inside a single portable folder. No Docker, no WSL, no cloud GPU. The backend uses a local LLAMA-based text encoder (or a lightweight hash fallback for lower VRAM) and the diffusion model runs entirely on your NVIDIA GPU.
+
 ## Quick Start
 
 ```powershell
@@ -89,3 +140,4 @@ Repository/
 
 - Kimodo: [NVIDIA Research](https://research.nvidia.com/labs/sil/projects/kimodo/)
 - Portable launcher & Cascadeur integration: [Soror L.'.L.'.](https://github.com/Methelina/KimoDer_portable)
+- Inspired by Anoxxy's scripts and his WSL/Linux/Ubuntu hybrid: [video](https://youtu.be/yu2X-zS840A)
