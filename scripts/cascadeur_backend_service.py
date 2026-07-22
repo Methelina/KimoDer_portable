@@ -597,7 +597,8 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body)
+        try: self.wfile.write(body)
+        except OSError: pass
 
     def do_GET(self):
         if self.path == "/health":

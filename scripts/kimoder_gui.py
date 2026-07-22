@@ -97,7 +97,7 @@ def hw():
                 dr=True
             except: pass
         _q.put(("demo_state",{"running":a,"pid":p,"port":pt,"ready":dr}))
-        _sd.wait(1.0)
+        _sd.wait(2.0)
 def mw():
     while not _sd.is_set():
         try:
