@@ -155,11 +155,13 @@ def build_env(profile: str = "llama") -> dict:
     return env
 
 
-def health(port: int = DEFAULT_PORT, timeout: float = 3.0):
+def health(port: int = DEFAULT_PORT, timeout: float = 3.0, client_id: str = "gui"):
     try:
-        with urllib.request.urlopen(
-            f"http://{HOST}:{port}/health", timeout=timeout
-        ) as response:
+        request = urllib.request.Request(
+            f"http://{HOST}:{port}/health",
+            headers={"X-Client-Id": client_id},
+        )
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))
     except Exception:
         return None

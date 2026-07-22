@@ -232,6 +232,7 @@ class BackendState:
         self.warmup_error = ""
         self._preload_thread = None
         self._model_locks = {}
+        self.clients = {}
 
     def get_or_load_model(self, dataset, emit_status):
         api = _kimodo_api()
@@ -363,7 +364,14 @@ class BackendState:
                 "device": self.device,
                 "watch_windows_pid": self.watch_windows_pid,
                 "text_encoder_profile": self.text_encoder_profile,
+                "clients": {k: round(v, 1) for k, v in self.clients.items()},
             }
+
+    def note_client(self, client_id):
+        if not client_id:
+            return
+        with self.lock:
+            self.clients[client_id] = time.time()
 
     def shutdown(self):
         self.shutdown_requested = True
@@ -612,6 +620,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         except OSError: pass
 
     def do_GET(self):
+        self.server.backend_state.note_client(self.headers.get("X-Client-Id", ""))
         if self.path == "/health":
             self._write_json(HTTPStatus.OK, self.server.backend_state.snapshot())
             return
@@ -631,6 +640,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         self._write_json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "Unknown endpoint"})
 
     def do_POST(self):
+        self.server.backend_state.note_client(self.headers.get("X-Client-Id", ""))
         if self.path == "/generate":
             try:
                 payload = self._read_json()

@@ -12,9 +12,9 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent; sys.path.insert(0, str(SCRIPT_DIR))
 import backend_ctl as bc
 import dearpygui.dearpygui as dpg
-SC="status_circle"; ST="status_text"; DC="demo_circle"; DST="demo_text"; IT="backend_info"; VT="vram_text"; RT="ram_text"; DT="demo_status"; LG="log_area"
+SC="status_circle"; ST="status_text"; DC="demo_circle"; DST="demo_text"; IT="backend_info"; VT="vram_text"; RT="ram_text"; DT="demo_status"; LG="log_area"; LK="cascadeur_link"
 _q=queue.Queue(); _sd=threading.Event()
-_st={"ok":False,"warming_up":False,"busy":False,"warmup_error":"","device":"-","text_encoder_profile":"-","loaded_datasets":[]}
+_st={"ok":False,"warming_up":False,"busy":False,"warmup_error":"","device":"-","text_encoder_profile":"-","loaded_datasets":[],"clients":{}}
 _ds={"running":False,"pid":0,"port":0,"ready":False}; _owned=False; _logbuf=[]; LB=8000
 def ct(t,g):
     u=g.upper(); sym=" "
@@ -46,6 +46,17 @@ def ap():
     if dpg.does_item_exist(DT):
         if _ds["running"]: dpg.set_value(DT,f"port :{_ds['port']}  pid {_ds['pid']}")
         else: dpg.set_value(DT,"")
+    if dpg.does_item_exist(LK):
+        import time as _t
+        cl=_st.get("clients",{})
+        ts=cl.get("cascadeur")
+        if ts and (_t.time()-ts)<20:
+            ago=int(_t.time()-ts)
+            dpg.set_value(LK,f"link: cascadeur ({ago}s ago)")
+            dpg.configure_item(LK,color=(80,210,100))
+        else:
+            dpg.set_value(LK,"link: offline")
+            dpg.configure_item(LK,color=(110,110,110))
     if dpg.does_item_exist("btn_demo_stop"): dpg.configure_item("btn_demo_stop",enabled=_ds["running"])
 def dq():
     for _ in range(200):
@@ -83,11 +94,11 @@ def hw():
         if s and s.get("ok"):
             was=True
             if fails>=3: ct("GUI","+ backend reachable")
-            fails=0; _q.put(("state",{"ok":True,"warming_up":bool(s.get("warming_up")),"busy":bool(s.get("busy")),"warmup_error":s.get("warmup_error") or "","device":s.get("device") or "-","text_encoder_profile":s.get("text_encoder_profile") or "-","loaded_datasets":s.get("loaded_datasets") or []}))
+            fails=0; _q.put(("state",{"ok":True,"warming_up":bool(s.get("warming_up")),"busy":bool(s.get("busy")),"warmup_error":s.get("warmup_error") or "","device":s.get("device") or "-","text_encoder_profile":s.get("text_encoder_profile") or "-","loaded_datasets":s.get("loaded_datasets") or [],"clients":s.get("clients") or {}}))
         else:
             fails+=1
             if was and fails==3: ct("GUI","* backend unreachable"); was=False
-            if fails>=3: _q.put(("state",{"ok":False,"warming_up":False,"busy":False,"warmup_error":"","device":"-","text_encoder_profile":"-","loaded_datasets":[]}))
+            if fails>=3: _q.put(("state",{"ok":False,"warming_up":False,"busy":False,"warmup_error":"","device":"-","text_encoder_profile":"-","loaded_datasets":[],"clients":{}}))
         a,p,pt=bc.demo_status()
         dr=False
         if a and pt:
@@ -190,6 +201,7 @@ def bg():
             dpg.add_button(label="Start (LLAMA NF4)",tag="btn_start_nf4",callback=lambda:sb("llama"))
             dpg.add_button(label="Start (LLAMA OFF)",tag="btn_start_off",callback=lambda:sb("fallback"))
             dpg.add_button(label="Stop Backend",tag="btn_stop",callback=stb)
+            dpg.add_text("link: offline",tag=LK,color=(110,110,110))
         dpg.add_separator()
 
         # ---- Kimodo Viser ----

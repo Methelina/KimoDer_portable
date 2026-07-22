@@ -1390,7 +1390,7 @@ def _popen_kwargs():
 
 def _http_json_request(url, method="GET", payload=None, timeout=60):
     data = None
-    headers = {}
+    headers = {"X-Client-Id": "cascadeur"}
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
         headers["Content-Type"] = "application/json"
