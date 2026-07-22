@@ -7,7 +7,7 @@ Version: 2.0.0
 Author:  Soror L.'. L.'.
 """
 
-import os, queue, subprocess, sys, threading, time, webbrowser
+import os, queue, subprocess, sys, textwrap, threading, time, webbrowser
 from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent; sys.path.insert(0, str(SCRIPT_DIR))
 import backend_ctl as bc
@@ -67,8 +67,9 @@ def dq():
         elif k=="vram" and dpg.does_item_exist(VT): dpg.set_value(VT,p)
         elif k=="ram" and dpg.does_item_exist(RT): dpg.set_value(RT,p)
         elif k=="log" and dpg.does_item_exist(LG):
-            _logbuf.append(p)
-            if len(_logbuf)>200: del _logbuf[:100]
+            for seg in textwrap.wrap(p, width=90, replace_whitespace=False, drop_whitespace=False) or [""]:
+                _logbuf.append(seg)
+            if len(_logbuf)>400: del _logbuf[:200]
             dpg.set_value(LG,"\n".join(_logbuf))
 def tf(fn,tg):
     off=0; first=True
