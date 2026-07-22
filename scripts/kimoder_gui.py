@@ -12,11 +12,13 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent; sys.path.insert(0, str(SCRIPT_DIR))
 import backend_ctl as bc
 import dearpygui.dearpygui as dpg
-SC="status_circle"; ST="status_text"; DC="demo_circle"; DST="demo_text"; IT="backend_info"; VT="vram_text"; RT="ram_text"; DT="demo_status"
+SC="status_circle"; ST="status_text"; DC="demo_circle"; DST="demo_text"; IT="backend_info"; VT="vram_text"; RT="ram_text"; DT="demo_status"; LG="log_area"
 _q=queue.Queue(); _sd=threading.Event()
 _st={"ok":False,"warming_up":False,"busy":False,"warmup_error":"","device":"-","text_encoder_profile":"-","loaded_datasets":[]}
-_ds={"running":False,"pid":0,"port":0,"ready":False}; _owned=False
-def ct(t,g): print(f"[{t}] {g}",flush=True)
+_ds={"running":False,"pid":0,"port":0,"ready":False}; _owned=False; _logbuf=[]; LB=8000
+def ct(t,g):
+    print(f"[{t}] {g}",flush=True)
+    _q.put(("log", f"[{t}] {g}"))
 def sc(): return ((230,70,70),"ERROR") if _st["warmup_error"] else ((110,110,110),"DOWN") if not _st["ok"] else ((240,200,60),"WARMING") if _st["warming_up"] else ((90,160,250),"BUSY") if _st["busy"] else ((80,210,100),"READY")
 def ap():
     c,l=sc()
@@ -46,6 +48,10 @@ def dq():
         elif k=="demo_state": _ds.update(p); ap()
         elif k=="vram" and dpg.does_item_exist(VT): dpg.set_value(VT,p)
         elif k=="ram" and dpg.does_item_exist(RT): dpg.set_value(RT,p)
+        elif k=="log" and dpg.does_item_exist(LG):
+            _logbuf.append(p)
+            if len(_logbuf)>200: del _logbuf[:100]
+            dpg.set_value(LG,"\n".join(_logbuf))
 def tf(fn,tg):
     off=0
     while not _sd.is_set():
@@ -177,8 +183,8 @@ def bg():
             dpg.add_button(label="Stop Viser",tag="btn_demo_stop",callback=spd)
             dpg.add_button(label="Log Folder",callback=olf)
         dpg.add_separator()
-        dpg.add_text("Console window is the log -- [backend] [demo] [gui] tags.",color=(100,105,115),wrap=600)
-    dpg.create_viewport(title="KimoDer -- Kimodo+Cascadeur Control",width=700,height=460)
+        dpg.add_input_text(tag=LG,multiline=True,readonly=True,width=-1,height=260,tracked=True)
+    dpg.create_viewport(title="KimoDer -- Kimodo+Cascadeur Control",width=700,height=720)
     dpg.setup_dearpygui(); dpg.show_viewport(); dpg.set_primary_window("main_window",True)
 def co():
     global _owned; _sd.set()
