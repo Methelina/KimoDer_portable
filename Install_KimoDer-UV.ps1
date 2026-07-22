@@ -122,7 +122,7 @@ function Test-Command {
 }
 
 function Test-IsInstalled {
-    return (Test-Path (Join-Path $ScriptPath $EnvName "Scripts\Activate.ps1"))
+    try { return (Test-Path (Join-Path $ScriptPath $EnvName "Scripts\Activate.ps1")) } catch { return $false }
 }
 
 function Invoke-WithRetry {
