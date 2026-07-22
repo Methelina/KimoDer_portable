@@ -1388,7 +1388,7 @@ def _popen_kwargs():
     return kwargs
 
 
-def _http_json_request(url, method="GET", payload=None, timeout=10):
+def _http_json_request(url, method="GET", payload=None, timeout=60):
     data = None
     headers = {}
     if payload is not None:
@@ -1765,7 +1765,7 @@ def _run_kimodo_generation(config, settings, constraints_path, output_path, outp
         "log_path": _to_wsl_path(log_path),
     }
     reporter.update(f"Submitting generation job to Kimodo backend... Log: {log_path}")
-    response = _http_json_request(f"{KIMODO_BACKEND_URL}/generate", method="POST", payload=payload, timeout=30)
+    response = _http_json_request(f"{KIMODO_BACKEND_URL}/generate", method="POST", payload=payload, timeout=120)
     if not response.get("ok"):
         raise RuntimeError(response.get("error") or "Kimodo backend rejected the generation job.")
 
@@ -1773,7 +1773,7 @@ def _run_kimodo_generation(config, settings, constraints_path, output_path, outp
     last_status = None
     last_progress = -1
     while True:
-        snapshot = _http_json_request(f"{KIMODO_BACKEND_URL}/jobs/{job_id}", timeout=10)
+        snapshot = _http_json_request(f"{KIMODO_BACKEND_URL}/jobs/{job_id}", timeout=60)
         if not snapshot.get("ok"):
             raise RuntimeError(snapshot.get("error") or "Kimodo backend job lookup failed.")
         job = snapshot.get("job") or {}
