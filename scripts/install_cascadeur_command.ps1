@@ -146,7 +146,7 @@ Write-Host "===== Cascadeur command installed =====" -ForegroundColor Green
 Write-Host "Installed to: $CommandDest"
 Write-Host ""
 Write-Host "Next steps:"
-Write-Host "  1. Start Kimodo backend: Install_KimoDer-UV.ps1 -> menu 2"
+Write-Host "  1. Start Kimodo backend: Run_KimoDer.ps1 -StartBackend llama"
 Write-Host "  2. Restart Cascadeur"
 Write-Host "  3. In Cascadeur: Animation Scripts -> Kimodo Roundtrip"
 Write-Host "  4. Click 'Start Kimodo (LLAMA NF4)', then 'Generate'"

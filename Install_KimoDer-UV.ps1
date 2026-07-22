@@ -1,5 +1,5 @@
 ﻿# ==========================================================
-# Kimodo Portable Installer & Launcher (v2.5.0-cascadeur)
+# Kimodo Portable Installer (v2.6.0-cascadeur)
 # ==========================================================
 # SYNOPSIS:
 #   Fully portable Kimodo installation + Cascadeur hybrid backend.
@@ -10,33 +10,24 @@
 #   .\Install_KimoDer-UV.ps1                    = interactive menu
 #   .\Install_KimoDer-UV.ps1 -Install           = full install (non-interactive)
 #   .\Install_KimoDer-UV.ps1 -Reinstall         = wipe & reinstall (non-interactive)
-#   .\Install_KimoDer-UV.ps1 -StartBackend llama = start backend & print status
-#   .\Install_KimoDer-UV.ps1 -StartBackend fallback
-#   .\Install_KimoDer-UV.ps1 -StopBackend       = stop backend
-#   .\Install_KimoDer-UV.ps1 -CheckBackend       = health-check & print JSON
-#   .\Install_KimoDer-UV.ps1 -StartDemo [-Offload] = launch demo
 #   .\Install_KimoDer-UV.ps1 -InstallCascadeurCommand -CascadeurRoot "path"
+#
+#   Runtime (start/stop backend, demo, GUI) is handled by Run_KimoDer.ps1.
 # ==========================================================
 # Based on: Soror L.'.L.' launcher v2.4.1
 # Cascadeur integration: Soror L.'.L.'.
-# Version: 2.5.0-cascadeur
+# Version: 2.6.0-cascadeur
 # Date: 2026-07-22
 # ==========================================================
 
 param(
     [switch]$Install,
     [switch]$Reinstall,
-    [ValidateSet("llama","fallback")]
-    [string]$StartBackend = "",
-    [switch]$StopBackend,
-    [switch]$CheckBackend,
-    [switch]$StartDemo,
-    [switch]$Offload,
     [string]$CascadeurRoot = "",
     [switch]$InstallCascadeurCommand,
     [switch]$Menu
 )
-$Script:CLI_MODE = ($Install -or $Reinstall -or $StartBackend -or $StopBackend -or $CheckBackend -or $StartDemo -or $InstallCascadeurCommand -or $Menu)
+$Script:CLI_MODE = ($Install -or $Reinstall -or $InstallCascadeurCommand -or $Menu)
 if (-not $Script:CLI_MODE) { $Script:CLI_MODE = $false; $Menu = $true }
 
 # ---- Init ----
@@ -986,52 +977,6 @@ function Install-Kimodo {
 }
 
 # ==========================================================
-# START CASCADEUR BACKEND
-# ==========================================================
-function Start-CascadeurBackend {
-    param([string]$Profile = "llama")
-
-    if (-not (Test-IsInstalled)) {
-        Write-Status "Environment not installed. Run the installer first." "ERROR"
-        return $false
-    }
-
-    Write-Status "Checking and applying patches..." "INFO"
-    if (-not (Ensure-PatchesApplied)) {
-        Write-Status "Patch was not applied. Model loading may fail." "WARN"
-    }
-
-    $BackendScript = Join-Path $ScriptPath "scripts\backend_ctl.py"
-    if (-not (Test-Path $BackendScript)) {
-        Write-Status "Backend script not found: $BackendScript. Install hybrid components first." "ERROR"
-        return $false
-    }
-    $PythonExe = Join-Path $ScriptPath "kimodo_env\Scripts\python.exe"
-
-    $ProfileLabel = if ($Profile -eq "fallback") { "LLAMA OFF" } else { "LLAMA NF4" }
-    Write-Status "Starting Kimodo Cascadeur backend ($ProfileLabel)..." "INFO"
-
-    & $PythonExe $BackendScript start --profile $Profile
-    if ($LASTEXITCODE -eq 0) {
-        Write-Status "Backend running at http://127.0.0.1:9552" "SUCCESS"
-    } else {
-        Write-Status "Failed to start backend." "ERROR"
-    }
-    return $true
-}
-
-function Stop-CascadeurBackend {
-    $BackendScript = Join-Path $ScriptPath "scripts\backend_ctl.py"
-    $PythonExe = Join-Path $ScriptPath "kimodo_env\Scripts\python.exe"
-    if (-not (Test-Path $BackendScript)) {
-        Write-Status "Backend script not found." "ERROR"
-        return $false
-    }
-    Write-Status "Stopping Kimodo Cascadeur backend..." "INFO"
-    & $PythonExe $BackendScript stop
-    return $true
-}
-
 # ==========================================================
 # UPDATE REPOSITORIES
 # ==========================================================
@@ -1050,6 +995,8 @@ function Update-Repositories {
         Pop-Location
     }
     Write-Status "Repositories updated." "SUCCESS"
+    Write-Status "Re-applying patches after update..." "INFO"
+    Ensure-PatchesApplied | Out-Null
 }
 
 # ==========================================================
@@ -1146,34 +1093,6 @@ function Ensure-PatchesApplied {
 }
 
 # ==========================================================
-# START KIMODO
-# ==========================================================
-function Start-Kimodo {
-    param([bool]$Offload = $false)
-
-    if (-not (Test-IsInstalled)) {
-        Write-Status "Environment not installed. Run the installer first." "ERROR"
-        return $false
-    }
-
-    Write-Status "Checking and applying patches..." "INFO"
-    if (-not (Ensure-PatchesApplied)) {
-        Write-Status "Patch was not applied. Model loading may fail." "WARN"
-    }
-
-    $activateScript = Join-Path $ScriptPath $EnvName "Scripts\Activate.ps1"
-    $kimodoDir = Join-Path $ScriptPath "kimodo"
-
-    Write-Status "Starting Kimodo (mode: $(if ($Offload) { 'OFFLOAD' } else { 'NORMAL' }))" "INFO"
-    & $activateScript
-    Push-Location $kimodoDir
-    python -m kimodo.demo $(if ($Offload) { "--offload" })
-    Pop-Location
-
-    return $true
-}
-
-# ==========================================================
 # MENU AND MAIN LOOP
 # ==========================================================
 function Show-Menu {
@@ -1191,20 +1110,16 @@ function Show-Menu {
     Write-Host "     ░  ░  ░    ░      ░  ░  ░    ░" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "  ===========================================" -ForegroundColor Cyan
-    Write-Host "    Kimodo+Cascadeur Portable v2.5.0 by L.'.L.'./Kilo" -ForegroundColor Green
+    Write-Host "    Kimodo+Cascadeur Portable v2.6.0 by L.'.L.'./Kilo" -ForegroundColor Green
     Write-Host "    Python 3.12 + PyTorch 2.8 CUDA 12.8" -ForegroundColor Cyan
     Write-Host "  ===========================================" -ForegroundColor Cyan
     Write-Host ""
     $installed = Test-IsInstalled
     if ($installed) {
-        Write-Host "  1) Start Kimodo Demo" -ForegroundColor Yellow
-        Write-Host "  2) Start Cascadeur Backend (LLAMA NF4)" -ForegroundColor Yellow
-        Write-Host "  3) Start Cascadeur Backend (LLAMA OFF)" -ForegroundColor Yellow
-        Write-Host "  4) Stop Cascadeur Backend" -ForegroundColor Yellow
-        Write-Host "  5) Reinstall (wipe and reinstall)" -ForegroundColor Yellow
-        Write-Host "  6) Update Repositories (git pull)" -ForegroundColor Yellow
-        Write-Host "  7) Install Cascadeur Command" -ForegroundColor Yellow
-        Write-Host "  8) Exit" -ForegroundColor Gray
+        Write-Host "  1) Reinstall (wipe and reinstall)" -ForegroundColor Yellow
+        Write-Host "  2) Update Repositories (git pull)" -ForegroundColor Yellow
+        Write-Host "  3) Install Cascadeur Command" -ForegroundColor Yellow
+        Write-Host "  4) Exit" -ForegroundColor Gray
     } else {
         Write-Host "  1) Install Kimodo (first time)" -ForegroundColor Yellow
         Write-Host "  2) Exit" -ForegroundColor Gray
@@ -1238,28 +1153,6 @@ if (-not $Menu) {
             Install-Kimodo -Reinstall $true
             if (-not (Test-IsInstalled)) { throw "Reinstall failed." }
         }
-        if ($StartBackend) {
-            Write-Status "CLI: starting backend ($StartBackend)..." "INFO"
-            Start-CascadeurBackend -Profile $StartBackend
-        }
-        if ($StopBackend) {
-            Write-Status "CLI: stopping backend..." "INFO"
-            Stop-CascadeurBackend
-        }
-        if ($CheckBackend) {
-            try {
-                $r = Invoke-RestMethod -Uri "http://127.0.0.1:9552/health" -Method Get -TimeoutSec 5
-                Write-Host ($r | ConvertTo-Json -Depth 3) -ForegroundColor Green
-                if (-not $r.ok) { $exitCode = 1 }
-            } catch {
-                Write-Host '{"ok":false,"error":"backend unreachable"}' -ForegroundColor Red
-                $exitCode = 1
-            }
-        }
-        if ($StartDemo) {
-            Write-Status "CLI: starting demo..." "INFO"
-            Start-Kimodo -Offload $Offload
-        }
         if ($InstallCascadeurCommand) {
             $cmdArgs = @{}
             if ($CascadeurRoot) { $cmdArgs.CascadeurRoot = $CascadeurRoot }
@@ -1281,50 +1174,19 @@ do {
                 Write-Status "Starting installation..." "INFO"
                 Install-Kimodo -Reinstall $false
             } else {
-                Write-Status "Preparing to launch..." "INFO"
-                $offloadChoice = Read-Host "Start with --offload (GPU < 8GB)? (y/n) [n]"
-                $offload = ($offloadChoice -eq 'y' -or $offloadChoice -eq 'Y')
-                Start-Kimodo -Offload $offload
+                Write-Status "Starting reinstall..." "INFO"
+                Install-Kimodo -Reinstall $true
             }
         }
         "2" {
             if ($installed) {
-                Start-CascadeurBackend -Profile "llama"
+                Update-Repositories
             } else {
                 Write-Status "Exiting." "INFO"
                 exit 0
             }
         }
         "3" {
-            if ($installed) {
-                Start-CascadeurBackend -Profile "fallback"
-            } else {
-                Write-Status "Invalid choice." "WARN"
-            }
-        }
-        "4" {
-            if ($installed) {
-                Stop-CascadeurBackend
-            } else {
-                Write-Status "Invalid choice." "WARN"
-            }
-        }
-        "5" {
-            if ($installed) {
-                Write-Status "Starting reinstall..." "INFO"
-                Install-Kimodo -Reinstall $true
-            } else {
-                Write-Status "Invalid choice." "WARN"
-            }
-        }
-        "6" {
-            if ($installed) {
-                Update-Repositories
-            } else {
-                Write-Status "Invalid choice." "WARN"
-            }
-        }
-        "7" {
             if ($installed) {
                 $CmdInstaller = Join-Path $ScriptPath "scripts\install_cascadeur_command.ps1"
                 if (Test-Path $CmdInstaller) {
@@ -1336,15 +1198,19 @@ do {
                 Write-Status "Invalid choice." "WARN"
             }
         }
-        "8" {
-            Write-Status "Exiting." "INFO"
-            exit 0
+        "4" {
+            if ($installed) {
+                Write-Status "Exiting." "INFO"
+                exit 0
+            } else {
+                Write-Status "Invalid choice." "WARN"
+            }
         }
         default {
             Write-Status "Invalid choice." "WARN"
         }
     }
-    if ($choice -ne "8") {
+    if ($choice -ne "2" -and $choice -ne "4") {
         Write-Host "`nPress any key to return to menu..." -ForegroundColor Gray
         $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
     }
