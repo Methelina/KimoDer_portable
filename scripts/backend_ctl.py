@@ -12,6 +12,7 @@ Author:  Soror L.'.L.'.
 import argparse
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -75,6 +76,14 @@ def log_path() -> Path:
 
 def pid_path() -> Path:
     return runtime_dir() / "cascadeur-kimodo-backend.pid"
+
+
+def demo_log_path() -> Path:
+    return runtime_dir() / "kimodo-demo.log"
+
+
+def demo_pid_path() -> Path:
+    return runtime_dir() / "kimodo-demo.pid"
 
 
 def python_exe() -> Path:
@@ -280,22 +289,107 @@ def stop(port: int = DEFAULT_PORT, status_cb=None) -> int:
 
     pid = current_pid()
     if pid and pid_alive(pid):
-        try:
-            if os.name == "nt":
-                subprocess.run(
-                    ["taskkill", "/PID", str(pid), "/F"],
-                    capture_output=True,
-                    timeout=10,
-                    creationflags=hidden_flags(),
-                )
-            else:
-                os.kill(pid, 9)
-            emit(f"Terminated backend process PID {pid}.")
-        except Exception as exc:
-            emit(f"Failed to terminate PID {pid}: {exc}")
+        _kill_pid(pid, emit)
     pid_path().unlink(missing_ok=True)
 
     emit("Kimodo backend stopped.")
+    return 0
+
+
+def _kill_pid(pid: int, emit) -> None:
+    try:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                capture_output=True,
+                timeout=10,
+                creationflags=hidden_flags(),
+            )
+        else:
+            os.kill(pid, 9)
+        emit(f"Terminated process PID {pid}.")
+    except Exception as exc:
+        emit(f"Failed to terminate PID {pid}: {exc}")
+
+
+def _read_pid(pidfile: Path) -> int:
+    if not pidfile.exists():
+        return 0
+    try:
+        return int(pidfile.read_text().strip() or "0")
+    except Exception:
+        return 0
+
+
+def demo_status() -> tuple:
+    pid = _read_pid(demo_pid_path())
+    if pid and pid_alive(pid):
+        port = 0
+        try:
+            log_text = demo_log_path().read_text(encoding="utf-8", errors="replace")
+            match = re.search(r"http://localhost:(\d+)", log_text)
+            if match:
+                port = int(match.group(1))
+        except Exception:
+            pass
+        if not port:
+            try:
+                port = int((runtime_dir() / "kimodo-demo.port").read_text().strip())
+            except Exception:
+                port = 0
+        return True, pid, port
+    return False, 0, 0
+
+
+def start_demo(port: int = 0, status_cb=None) -> tuple:
+    emit = status_cb or (lambda msg: print(f"STATUS: {msg}", flush=True))
+
+    alive, old_pid, old_port = demo_status()
+    if alive:
+        emit(f"Demo already running (PID {old_pid}, port {old_port}).")
+        return old_pid, old_port
+
+    kimodo_dir = repo_root() / "kimodo"
+    if not kimodo_dir.is_dir():
+        emit("kimodo folder not found.")
+        return 0, 0
+
+    if not port:
+        port = find_free_port()
+
+    env = build_env("llama")
+    env["SERVER_PORT"] = str(port)
+
+    log_file = open(demo_log_path(), "w", encoding="utf-8", errors="replace")
+    proc = subprocess.Popen(
+        [str(python_exe()), "-m", "kimodo.demo"],
+        cwd=str(kimodo_dir),
+        env=env,
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+        stdin=subprocess.DEVNULL,
+        creationflags=detached_flags(),
+        close_fds=True,
+    )
+    demo_pid_path().write_text(str(proc.pid))
+    try:
+        (runtime_dir() / "kimodo-demo.port").write_text(str(port))
+    except Exception:
+        pass
+    emit(f"Demo started (PID {proc.pid}) on port {port}.")
+    return proc.pid, port
+
+
+def stop_demo(status_cb=None) -> int:
+    emit = status_cb or (lambda msg: print(f"STATUS: {msg}", flush=True))
+    pid = _read_pid(demo_pid_path())
+    if pid and pid_alive(pid):
+        _kill_pid(pid, emit)
+    else:
+        emit("Demo is not running.")
+    demo_pid_path().unlink(missing_ok=True)
+    (runtime_dir() / "kimodo-demo.port").unlink(missing_ok=True)
+    emit("Demo stopped.")
     return 0
 
 

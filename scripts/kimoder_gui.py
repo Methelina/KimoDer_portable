@@ -1,12 +1,12 @@
 """
 KimoDer GUI — DearPyGui control panel for Kimodo+Cascadeur backend.
 
-Start/Stop backend buttons, live status indicator (green/yellow/red),
-full backend log tail with colored levels and autoscroll.
+Start/Stop backend buttons, Start/Stop demo buttons, tri-state status
+indicator, per-service log tabs with colored levels and autoscroll.
 
 Launched by Run_KimoDer.ps1 via kimodo_env python.
 
-Version: 1.1.0
+Version: 1.2.0
 Author:  Soror L.'.L.'.
 """
 
@@ -27,20 +27,23 @@ import backend_ctl as bc
 
 import dearpygui.dearpygui as dpg
 
-LOG_TAG = "log_area"
+LOG_BACKEND_TAG = "log_area_backend"
+LOG_DEMO_TAG = "log_area_demo"
 STATUS_CIRCLE_TAG = "status_circle"
 STATUS_TEXT_TAG = "status_text"
 INFO_TAG = "backend_info"
 VRAM_TAG = "vram_text"
 RAM_TAG = "ram_text"
-PROGRESS_TAG = "warm_progress"
+DEMO_STATUS_TAG = "demo_status"
 
 MAX_LOG_LINES = 3000
 
 _ui_queue = queue.Queue()
 _shutdown = threading.Event()
-_log_items = []
-_log_offset = 0
+
+_log_items = {LOG_BACKEND_TAG: [], LOG_DEMO_TAG: []}
+_log_offsets = {LOG_BACKEND_TAG: 0, LOG_DEMO_TAG: 0}
+
 _state = {
     "ok": False,
     "warming_up": False,
@@ -50,11 +53,13 @@ _state = {
     "text_encoder_profile": "-",
     "loaded_datasets": [],
 }
+_demo_state = {"running": False, "pid": 0, "port": 0}
 _backend_was_up = False
+_demo_owned_by_gui = False
 
 
-def log_line(text, color=(190, 190, 190)):
-    _ui_queue.put(("log", str(text), color))
+def log_line(text, color=(190, 190, 190), tab=LOG_BACKEND_TAG):
+    _ui_queue.put(("log", tab, str(text), color))
 
 
 def classify_line(line):
@@ -67,7 +72,7 @@ def classify_line(line):
         return (120, 220, 250)
     if "PROGRESS:" in up:
         return (130, 230, 140)
-    if "OK" in up and ("[" in line or "ready" in line.lower()):
+    if "ready" in line.lower() or "loaded successfully" in line.lower():
         return (130, 230, 140)
     return (185, 185, 185)
 
@@ -84,19 +89,19 @@ def backend_status_color():
     return (80, 210, 100), "READY"
 
 
-def _append_log_item(text, color):
-    global _log_items
+def _append_log_item(tab, text, color):
+    items = _log_items[tab]
     try:
-        item = dpg.add_text(text, parent=LOG_TAG, color=color, wrap=0)
-        _log_items.append(item)
-        if len(_log_items) > MAX_LOG_LINES:
-            old = _log_items[: len(_log_items) - MAX_LOG_LINES]
-            _log_items = _log_items[len(_log_items) - MAX_LOG_LINES :]
+        item = dpg.add_text(text, parent=tab, color=color, wrap=0)
+        items.append(item)
+        if len(items) > MAX_LOG_LINES:
+            old = items[: len(items) - MAX_LOG_LINES]
+            _log_items[tab] = items[len(items) - MAX_LOG_LINES :]
             for o in old:
                 if dpg.does_item_exist(o):
                     dpg.delete_item(o)
         if dpg.get_value("autoscroll_chk"):
-            dpg.set_y_scroll(LOG_TAG, 1e9)
+            dpg.set_y_scroll(tab, 1e9)
     except Exception:
         pass
 
@@ -119,20 +124,32 @@ def _apply_state():
         if dpg.does_item_exist(tag):
             dpg.configure_item(tag, enabled=not running)
     if dpg.does_item_exist("btn_stop"):
-        dpg.configure_item("btn_stop", enabled=running)
+        dpg.configure_item(tag, enabled=running)
+
+    if dpg.does_item_exist(DEMO_STATUS_TAG):
+        if _demo_state["running"]:
+            dpg.set_value(DEMO_STATUS_TAG, f"demo: running on :{_demo_state['port']} (pid {_demo_state['pid']})")
+            dpg.configure_item(DEMO_STATUS_TAG, color=(80, 210, 100))
+        else:
+            dpg.set_value(DEMO_STATUS_TAG, "demo: stopped")
+            dpg.configure_item(DEMO_STATUS_TAG, color=(110, 110, 110))
+    if dpg.does_item_exist("btn_demo_stop"):
+        dpg.configure_item("btn_demo_stop", enabled=_demo_state["running"])
 
 
 def drain_queue():
-    global _state
     for _ in range(200):
         try:
             kind, *payload = _ui_queue.get_nowait()
         except queue.Empty:
             break
         if kind == "log":
-            _append_log_item(payload[0], payload[1])
+            _append_log_item(payload[0], payload[1], payload[2])
         elif kind == "state":
             _state.update(payload[0])
+            _apply_state()
+        elif kind == "demo_state":
+            _demo_state.update(payload[0])
             _apply_state()
         elif kind == "vram":
             if dpg.does_item_exist(VRAM_TAG):
@@ -142,24 +159,24 @@ def drain_queue():
                 dpg.set_value(RAM_TAG, payload[0])
 
 
-def _tail_log_worker():
-    global _log_offset
+def _tail_worker(path_fn, tab):
     while not _shutdown.is_set():
         try:
-            lp = bc.log_path()
+            lp = path_fn()
             if lp.is_file():
                 size = lp.stat().st_size
-                if size < _log_offset:
-                    _log_offset = 0
-                if size > _log_offset:
+                offset = _log_offsets[tab]
+                if size < offset:
+                    offset = 0
+                if size > offset:
                     with open(lp, "r", encoding="utf-8", errors="replace") as f:
-                        f.seek(_log_offset)
+                        f.seek(offset)
                         chunk = f.read()
-                    _log_offset = f.tell()
+                    _log_offsets[tab] = f.tell()
                     for line in chunk.splitlines():
                         line = line.rstrip()
                         if line:
-                            log_line(line, classify_line(line))
+                            log_line(line, classify_line(line), tab=tab)
         except Exception:
             pass
         _shutdown.wait(0.3)
@@ -193,6 +210,9 @@ def _health_worker():
                 "text_encoder_profile": "-",
                 "loaded_datasets": [],
             }))
+
+        alive, pid, port = bc.demo_status()
+        _ui_queue.put(("demo_state", {"running": alive, "pid": pid, "port": port}))
         _shutdown.wait(1.0)
 
 
@@ -249,50 +269,48 @@ def _stop_backend():
     threading.Thread(target=work, daemon=True).start()
 
 
-def _open_demo():
+def _start_demo():
     def work():
-        try:
-            kimodo_dir = bc.repo_root() / "kimodo"
-            if not kimodo_dir.is_dir():
-                log_line("kimodo folder not found.", (235, 110, 110))
-                return
-            demo_port = bc.find_free_port()
-            demo_log = bc.runtime_dir() / "kimodo-demo.log"
-            env = bc.build_env("llama")
-            env["SERVER_PORT"] = str(demo_port)
-            log_file = open(demo_log, "w", encoding="utf-8", errors="replace")
-            subprocess.Popen(
-                [str(bc.python_exe()), "-m", "kimodo.demo"],
-                cwd=str(kimodo_dir),
-                env=env,
-                stdout=log_file,
-                stderr=subprocess.STDOUT,
-                stdin=subprocess.DEVNULL,
-                creationflags=bc.detached_flags(),
-                close_fds=True,
-            )
-            log_line(f"Demo starting on port {demo_port} (model load takes 1-2 min)...", (130, 230, 140))
+        global _demo_owned_by_gui
+        alive, pid, port = bc.demo_status()
+        if alive:
+            log_line(f">>> demo already running on :{port}, opening browser.", (230, 200, 90), tab=LOG_DEMO_TAG)
+            webbrowser.open(f"http://127.0.0.1:{port}")
+            return
+        log_line(">>> starting demo (model load takes 1-2 min) ...", (120, 220, 250), tab=LOG_DEMO_TAG)
+        pid, port = bc.start_demo(status_cb=lambda m: log_line(f"STATUS: {m}", (120, 220, 250), tab=LOG_DEMO_TAG))
+        if not pid:
+            log_line(">>> demo failed to start.", (235, 110, 110), tab=LOG_DEMO_TAG)
+            return
+        _demo_owned_by_gui = True
+        url = f"http://127.0.0.1:{port}"
+        import urllib.request
 
-            url = f"http://127.0.0.1:{demo_port}"
-            deadline = time.time() + 240
-            while time.time() < deadline:
-                try:
-                    import urllib.request
+        deadline = time.time() + 240
+        while time.time() < deadline:
+            try:
+                with urllib.request.urlopen(url, timeout=2) as resp:
+                    if resp.status == 200:
+                        break
+            except Exception:
+                pass
+            time.sleep(2)
+        else:
+            log_line(f">>> demo did not respond on {url} within 240s. See Demo log tab.", (235, 110, 110), tab=LOG_DEMO_TAG)
+            return
+        log_line(f">>> demo ready at {url}", (130, 230, 140), tab=LOG_DEMO_TAG)
+        webbrowser.open(url)
 
-                    with urllib.request.urlopen(url, timeout=2) as resp:
-                        if resp.status == 200:
-                            break
-                except Exception:
-                    pass
-                time.sleep(2)
-            else:
-                log_line(f"Demo did not respond on {url} within 240s. Check kimodo-demo.log.", (235, 110, 110))
-                return
+    threading.Thread(target=work, daemon=True).start()
 
-            log_line(f"Demo ready at {url}", (130, 230, 140))
-            webbrowser.open(url)
-        except Exception as exc:
-            log_line(f"Demo launch failed: {exc}", (235, 110, 110))
+
+def _stop_demo():
+    def work():
+        global _demo_owned_by_gui
+        log_line(">>> stopping demo ...", (120, 220, 250), tab=LOG_DEMO_TAG)
+        bc.stop_demo(status_cb=lambda m: log_line(f"STATUS: {m}", (120, 220, 250), tab=LOG_DEMO_TAG))
+        _demo_owned_by_gui = False
+        log_line(">>> demo stopped.", (230, 200, 90), tab=LOG_DEMO_TAG)
 
     threading.Thread(target=work, daemon=True).start()
 
@@ -305,11 +323,11 @@ def _open_log_folder():
 
 
 def _clear_log():
-    global _log_items
-    for item in _log_items:
-        if dpg.does_item_exist(item):
-            dpg.delete_item(item)
-    _log_items = []
+    for tab in (LOG_BACKEND_TAG, LOG_DEMO_TAG):
+        for item in _log_items[tab]:
+            if dpg.does_item_exist(item):
+                dpg.delete_item(item)
+        _log_items[tab] = []
 
 
 def build_gui():
@@ -331,7 +349,7 @@ def build_gui():
     with dpg.window(tag="main_window", label="KimoDer Control", no_title_bar=True,
                     no_resize=False, no_collapse=True):
         with dpg.group(horizontal=True):
-            dpg.add_text("KimoDer v1.1.0", color=(140, 160, 220))
+            dpg.add_text("KimoDer v1.2.0", color=(140, 160, 220))
             dpg.add_text("  |  by Soror L.'.L.'.", color=(110, 115, 125))
         dpg.add_separator()
 
@@ -348,36 +366,60 @@ def build_gui():
             dpg.add_text("RAM -", tag=RAM_TAG)
 
         dpg.add_separator()
+        dpg.add_text("Cascadeur backend (port 9552):", color=(140, 145, 155))
 
         with dpg.group(horizontal=True):
-            dpg.add_button(label="Start Backend (LLAMA NF4)", tag="btn_start_nf4",
-                           width=220, height=36,
+            dpg.add_button(label="Start (LLAMA NF4)", tag="btn_start_nf4",
+                           width=180, height=34,
                            callback=lambda: _start_backend("llama"))
-            dpg.add_button(label="Start Backend (LLAMA OFF)", tag="btn_start_off",
-                           width=220, height=36,
+            dpg.add_button(label="Start (LLAMA OFF)", tag="btn_start_off",
+                           width=180, height=34,
                            callback=lambda: _start_backend("fallback"))
-            dpg.add_button(label="Stop Backend", tag="btn_stop", width=140, height=36,
+            dpg.add_button(label="Stop Backend", tag="btn_stop", width=130, height=34,
                            callback=_stop_backend)
 
+        dpg.add_separator()
+
         with dpg.group(horizontal=True):
-            dpg.add_button(label="Open Web Demo", width=160,
-                           callback=_open_demo)
-            dpg.add_button(label="Open Log Folder", width=160,
+            dpg.add_text("Web demo (viser):", color=(140, 145, 155))
+            dpg.add_text("demo: stopped", tag=DEMO_STATUS_TAG, color=(110, 110, 110))
+
+        with dpg.group(horizontal=True):
+            dpg.add_button(label="Open Web Demo", tag="btn_demo_start", width=180, height=34,
+                           callback=_start_demo)
+            dpg.add_button(label="Stop Demo", tag="btn_demo_stop", width=130, height=34,
+                           callback=_stop_demo)
+            dpg.add_button(label="Open Log Folder", width=140,
                            callback=_open_log_folder)
-            dpg.add_button(label="Clear Log", width=110, callback=_clear_log)
+            dpg.add_button(label="Clear Log", width=100, callback=_clear_log)
             dpg.add_checkbox(label="Autoscroll", tag="autoscroll_chk", default_value=True)
 
         dpg.add_separator()
-        dpg.add_text("Backend log:", color=(140, 145, 155))
 
-        with dpg.child_window(tag=LOG_TAG, border=True, height=-1,
-                              horizontal_scrollbar=True):
-            pass
+        with dpg.tab_bar():
+            with dpg.tab(label="Backend log"):
+                with dpg.child_window(tag=LOG_BACKEND_TAG, border=True, height=-1,
+                                      horizontal_scrollbar=True):
+                    pass
+            with dpg.tab(label="Demo log"):
+                with dpg.child_window(tag=LOG_DEMO_TAG, border=True, height=-1,
+                                      horizontal_scrollbar=True):
+                    pass
 
-    dpg.create_viewport(title="KimoDer — Kimodo+Cascadeur Control by Soror L.'.L.'.", width=980, height=640)
+    dpg.create_viewport(title="KimoDer — Kimodo+Cascadeur Control by Soror L.'.L.'.", width=1020, height=680)
     dpg.setup_dearpygui()
     dpg.show_viewport()
     dpg.set_primary_window("main_window", True)
+
+
+def _cleanup_on_exit():
+    global _demo_owned_by_gui
+    _shutdown.set()
+    if _demo_owned_by_gui:
+        try:
+            bc.stop_demo(status_cb=lambda m: None)
+        except Exception:
+            pass
 
 
 def main():
@@ -388,7 +430,8 @@ def main():
     build_gui()
 
     workers = [
-        threading.Thread(target=_tail_log_worker, daemon=True),
+        threading.Thread(target=_tail_worker, args=(bc.log_path, LOG_BACKEND_TAG), daemon=True),
+        threading.Thread(target=_tail_worker, args=(bc.demo_log_path, LOG_DEMO_TAG), daemon=True),
         threading.Thread(target=_health_worker, daemon=True),
         threading.Thread(target=_metrics_worker, daemon=True),
     ]
@@ -398,13 +441,14 @@ def main():
     log_line("KimoDer GUI ready.", (130, 230, 140))
     log_line(f"Repo root: {bc.repo_root()}", (140, 145, 155))
     log_line(f"Backend log: {bc.log_path()}", (140, 145, 155))
+    log_line("Demo log tab tails: " + str(bc.demo_log_path()), (140, 145, 155), tab=LOG_DEMO_TAG)
 
     try:
         while dpg.is_dearpygui_running():
             drain_queue()
             dpg.render_dearpygui_frame()
     finally:
-        _shutdown.set()
+        _cleanup_on_exit()
         dpg.destroy_context()
     return 0
 
