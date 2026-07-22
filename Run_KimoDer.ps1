@@ -105,8 +105,8 @@ if (-not (Test-Path $GuiScript)) {
     exit 1
 }
 
-$Launcher = $PythonwExe
-if (-not (Test-Path $Launcher)) { $Launcher = $PythonExe }
+$Launcher = $PythonExe
+# always use python.exe (visible console = log, EveryNyan pattern)
 
 & $Launcher $GuiScript
 exit $LASTEXITCODE

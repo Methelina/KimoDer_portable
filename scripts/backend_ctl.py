@@ -400,37 +400,93 @@ def main() -> int:
     p_start = sub.add_parser("start")
     p_start.add_argument("--profile", choices=["llama", "fallback"], default="llama")
     p_start.add_argument("--preload-dataset", default="RP")
-    p_start.add_argument("--port", type=int, default=DEFAULT_PORT)
+    p_start.add_argument("--port", type=int, default=0)
     p_start.add_argument("--watch-pid", type=int, default=0)
     p_start.add_argument("--no-wait", action="store_true")
+    p_start.add_argument("--watch", action="store_true",
+                         help="Keep console open with live status; stop backend on Ctrl+C")
 
     p_stop = sub.add_parser("stop")
-    p_stop.add_argument("--port", type=int, default=DEFAULT_PORT)
+    p_stop.add_argument("--port", type=int, default=0)
 
     p_health = sub.add_parser("health")
-    p_health.add_argument("--port", type=int, default=DEFAULT_PORT)
+    p_health.add_argument("--port", type=int, default=0)
     p_health.add_argument("--json", action="store_true")
+
+    p_start_demo = sub.add_parser("start-demo")
+    p_start_demo.add_argument("--port", type=int, default=0)
+    p_start_demo.add_argument("--watch", action="store_true")
+
+    p_stop_demo = sub.add_parser("stop-demo")
 
     args = parser.parse_args()
 
     if args.command == "start":
-        return start(
+        port = args.port if args.port else DEFAULT_PORT
+        rc = start(
             profile=args.profile,
             preload_dataset=args.preload_dataset,
-            port=args.port,
+            port=port,
             watch_pid=args.watch_pid,
             wait=not args.no_wait,
         )
+        if rc == 0 and args.watch:
+            _watch_backend(port)
+            return stop(port=port)
+        return rc
     if args.command == "stop":
-        return stop(port=args.port)
+        port = args.port if args.port else DEFAULT_PORT
+        return stop(port=port)
     if args.command == "health":
-        snap = health(port=args.port)
+        port = args.port if args.port else DEFAULT_PORT
+        snap = health(port=port)
         if args.json:
             print(json.dumps(snap or {"ok": False, "error": "backend unreachable"}))
         else:
             print(json.dumps(snap, indent=2) if snap else "backend unreachable")
         return 0 if (snap and snap.get("ok")) else 1
+    if args.command == "start-demo":
+        _, port = start_demo(port=args.port)
+        if not port:
+            return 1
+        print(f"\nDemo at http://127.0.0.1:{port}", flush=True)
+        if args.watch:
+            _watch_demo()
+            return stop_demo()
+        return 0
+    if args.command == "stop-demo":
+        return stop_demo()
     return 1
+
+
+def _watch_backend(port: int):
+    print("\n--- Watching backend (Ctrl+C to stop) ---", flush=True)
+    try:
+        while True:
+            snap = health(port, timeout=3.0)
+            if snap and snap.get("ok"):
+                datasets = ", ".join(snap.get("loaded_datasets", []))
+                warming = " (warming up...)" if snap.get("warming_up") else ""
+                print(f"[{datasets}{warming}]", flush=True)
+            else:
+                print("[unreachable]", flush=True)
+            time.sleep(5)
+    except KeyboardInterrupt:
+        print("\nShutting down...", flush=True)
+
+
+def _watch_demo():
+    print("\n--- Watching demo (Ctrl+C to stop) ---", flush=True)
+    try:
+        while True:
+            alive, pid, port = demo_status()
+            if not alive:
+                print("[demo exited]", flush=True)
+                break
+            print(f"[demo running pid={pid} port={port}]", flush=True)
+            time.sleep(5)
+    except KeyboardInterrupt:
+        print("\nShutting down demo...", flush=True)
 
 
 if __name__ == "__main__":
