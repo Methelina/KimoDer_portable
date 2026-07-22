@@ -261,6 +261,17 @@ class BackendState:
             info = api["get_model_info"](resolved_name)
             emit_status(f"Loaded model: {info.display_name if info is not None else resolved_name}")
 
+            # Warm up the text encoder in this preload thread so the first
+            # generation job does not block the HTTP thread while the encoder
+            # loads from disk and transfers 5.4GB to VRAM (hybrid used a
+            # separate text-encoder process; we load it in-process).
+            try:
+                emit_status("Warming up text encoder...")
+                model.text_encoder(["warmup"])
+                emit_status("Text encoder ready.")
+            except Exception as exc:
+                emit_status(f"Text encoder warmup warning: {exc}")
+
             with self.lock:
                 self.models[dataset] = (model, resolved_name)
                 return self.models[dataset]
