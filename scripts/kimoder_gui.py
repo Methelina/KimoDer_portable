@@ -1,4 +1,4 @@
-"""
+﻿"""
 KimoDer GUI - DearPyGui control panel for Kimodo+Cascadeur backend.
 Start/Stop buttons, status indicators, all logs printed to the
 console window with [backend]/[demo] tags (EveryNyan pattern).
@@ -17,8 +17,15 @@ _q=queue.Queue(); _sd=threading.Event()
 _st={"ok":False,"warming_up":False,"busy":False,"warmup_error":"","device":"-","text_encoder_profile":"-","loaded_datasets":[]}
 _ds={"running":False,"pid":0,"port":0,"ready":False}; _owned=False; _logbuf=[]; LB=8000
 def ct(t,g):
-    print(f"[{t}] {g}",flush=True)
-    _q.put(("log", f"[{t}] {g}"))
+    us=g.upper()
+    if "ERROR" in us or "TRACEBACK" in us or "FAIL" in us: sym,ux, lvl="! ","✗ ","[ERROR] "
+    elif "WARN" in us: sym,ux,lvl="* ","⚠ ","[WARN]  "
+    elif "READY" in us or "loaded" in g or "OK" in g[:4]: sym,ux,lvl="+ ","✓ ","[OK]    "
+    elif ">>>" in g[:4]: sym,ux,lvl="> ","→ ",""
+    elif "STATUS" in us[:10]: sym,ux,lvl=". ","● ","[STATUS]"
+    else: sym,ux,lvl="  ","  ","       "
+    print(f"[{t:19s}] {sym} {lvl}  {g}",flush=True)
+    _q.put(("log",f"[{t:19s}] {ux} {g}"))
 def sc(): return ((230,70,70),"ERROR") if _st["warmup_error"] else ((110,110,110),"DOWN") if not _st["ok"] else ((240,200,60),"WARMING") if _st["warming_up"] else ((90,160,250),"BUSY") if _st["busy"] else ((80,210,100),"READY")
 def ap():
     c,l=sc()
@@ -76,7 +83,7 @@ def hw():
         if s and s.get("ok"):
             w=True; _q.put(("state",{"ok":True,"warming_up":bool(s.get("warming_up")),"busy":bool(s.get("busy")),"warmup_error":s.get("warmup_error") or "","device":s.get("device") or "-","text_encoder_profile":s.get("text_encoder_profile") or "-","loaded_datasets":s.get("loaded_datasets") or []}))
         else:
-            if w: ct("gui","--- backend unreachable ---"); w=False
+            if w: ct("GUI","--- backend unreachable ---"); w=False
             _q.put(("state",{"ok":False,"warming_up":False,"busy":False,"warmup_error":"","device":"-","text_encoder_profile":"-","loaded_datasets":[]}))
         a,p,pt=bc.demo_status()
         dr=False
@@ -104,24 +111,24 @@ def mw():
 def sb(p):
     def w():
         lab="LLAMA NF4" if p=="llama" else "LLAMA OFF"
-        ct("gui",f">>> starting backend ({lab}) ...")
-        rc=bc.start(profile=p,status_cb=lambda m:ct("gui",f"STATUS: {m}"))
-        ct("gui",">>> backend is ready." if rc==0 else ">>> backend failed to start.")
+        ct("GUI",f">>> starting backend ({lab}) ...")
+        rc=bc.start(profile=p,status_cb=lambda m:ct("GUI",f"STATUS: {m}"))
+        ct("GUI",">>> backend is ready." if rc==0 else ">>> backend failed to start.")
     threading.Thread(target=w,daemon=True).start()
 def stb():
     def w():
-        ct("gui",">>> stopping backend ...")
-        bc.stop(status_cb=lambda m:ct("gui",f"STATUS: {m}"))
-        ct("gui",">>> backend stopped.")
+        ct("GUI",">>> stopping backend ...")
+        bc.stop(status_cb=lambda m:ct("GUI",f"STATUS: {m}"))
+        ct("GUI",">>> backend stopped.")
     threading.Thread(target=w,daemon=True).start()
 def sdm():
     def w():
         global _owned
         a,pid,port=bc.demo_status()
-        if a: ct("gui",f">>> demo already running on :{port}, opening browser."); webbrowser.open(f"http://127.0.0.1:{port}"); return
-        ct("gui",">>> starting demo (model load takes 1-2 min) ...")
-        pid,port=bc.start_demo(status_cb=lambda m:ct("gui",f"STATUS: {m}"))
-        if not pid: ct("gui",">>> demo failed to start."); return
+        if a: ct("GUI",f">>> demo already running on :{port}, opening browser."); webbrowser.open(f"http://127.0.0.1:{port}"); return
+        ct("GUI",">>> starting demo (model load takes 1-2 min) ...")
+        pid,port=bc.start_demo(status_cb=lambda m:ct("GUI",f"STATUS: {m}"))
+        if not pid: ct("GUI",">>> demo failed to start."); return
         _owned=True; url=f"http://127.0.0.1:{port}"
         import urllib.request; dl=time.time()+240
         while time.time()<dl:
@@ -130,15 +137,15 @@ def sdm():
                     if r.status==200: break
             except: pass
             time.sleep(2)
-        else: ct("gui",f">>> demo did not respond on {url} within 240s."); return
-        ct("gui",f">>> demo ready at {url}"); webbrowser.open(url)
+        else: ct("GUI",f">>> demo did not respond on {url} within 240s."); return
+        ct("GUI",f">>> demo ready at {url}"); webbrowser.open(url)
     threading.Thread(target=w,daemon=True).start()
 def spd():
     def w():
         global _owned
-        ct("gui",">>> stopping demo ...")
-        bc.stop_demo(status_cb=lambda m:ct("gui",f"STATUS: {m}"))
-        _owned=False; ct("gui",">>> demo stopped.")
+        ct("GUI",">>> stopping demo ...")
+        bc.stop_demo(status_cb=lambda m:ct("GUI",f"STATUS: {m}"))
+        _owned=False; ct("GUI",">>> demo stopped.")
     threading.Thread(target=w,daemon=True).start()
 def olf():
     try: os.startfile(str(bc.runtime_dir()))
@@ -208,15 +215,15 @@ def co():
         try: bc.stop_demo(status_cb=lambda m:None)
         except: pass
 def main():
-    if not bc.is_installed(): print("[gui] Environment not installed."); return 1
-    print("[gui] KimoDer GUI starting...",flush=True)
-    print(f"[gui] Repo root: {bc.repo_root()}",flush=True)
+    if not bc.is_installed(): print("[GUI] Environment not installed."); return 1
+    ct("GUI","KimoDer GUI starting...")
+    ct("GUI",f"Repo root: {bc.repo_root()}")
     for p in (bc.log_path(), bc.demo_log_path()):
         try: p.write_text("",encoding="utf-8")
         except: pass
     bg()
-    for w in [threading.Thread(target=tf,args=(bc.log_path,"backend"),daemon=True),
-              threading.Thread(target=tf,args=(bc.demo_log_path,"demo"),daemon=True),
+    for w in [threading.Thread(target=tf,args=(bc.log_path,"Cascadeur BackEnd"),daemon=True),
+              threading.Thread(target=tf,args=(bc.demo_log_path,"Kimodo Viser"),daemon=True),
               threading.Thread(target=hw,daemon=True),
               threading.Thread(target=mw,daemon=True)]: w.start()
     try:
