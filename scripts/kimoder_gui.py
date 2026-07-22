@@ -12,11 +12,21 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent; sys.path.insert(0, str(SCRIPT_DIR))
 import backend_ctl as bc
 import dearpygui.dearpygui as dpg
-SC="status_circle"; ST="status_text"; IT="backend_info"; VT="vram_text"; RT="ram_text"; DT="demo_status"
+SC="status_circle"; ST="status_text"; DC="demo_circle"; DST="demo_text"
+IT="backend_info"; VT="vram_text"; RT="ram_text"; DT="demo_status"; LG="log_area"
 _q=queue.Queue(); _sd=threading.Event()
 _st={"ok":False,"warming_up":False,"busy":False,"warmup_error":"","device":"-","text_encoder_profile":"-","loaded_datasets":[]}
-_ds={"running":False,"pid":0,"port":0}; _owned=False
-def ct(t,g): print(f"[{t}] {g}",flush=True)
+_ds={"running":False,"pid":0,"port":0,"ready":False}; _owned=False; _log=[]; ML=2000
+def ct(t,g,color=None):
+    print(f"[{t}] {g}",flush=True)
+    _q.put(("log", f"[{t}] {g}", color or _cl(g)))
+def _cl(ln):
+    u=ln.upper()
+    if "TRACEBACK" in u or "ERROR" in u or "EXCEPTION" in u: return (235,110,110)
+    if "WARN" in u: return (230,200,90)
+    if "STATUS:" in u: return (120,220,250)
+    if "ready" in ln.lower(): return (130,230,140)
+    return (185,185,185)
 def sc(): return ((230,70,70),"ERROR") if _st["warmup_error"] else ((110,110,110),"DOWN") if not _st["ok"] else ((240,200,60),"WARMING") if _st["warming_up"] else ((90,160,250),"BUSY") if _st["busy"] else ((80,210,100),"READY")
 def ap():
     c,l=sc()
@@ -27,18 +37,35 @@ def ap():
     for t in ("btn_start_nf4","btn_start_off"):
         if dpg.does_item_exist(t): dpg.configure_item(t,enabled=not r)
     if dpg.does_item_exist("btn_stop"): dpg.configure_item("btn_stop",enabled=r)
+    if dpg.does_item_exist(DC):
+        if not _ds["running"]: dc,dl=(110,110,110),"STOPPED"
+        elif _ds.get("ready"): dc,dl=(80,210,100),"READY"
+        elif _ds["running"]: dc,dl=(240,200,60),"LOADING"
+        else: dc,dl=(110,110,110),"STOPPED"
+        dpg.configure_item(DC,fill=dc)
+        if dpg.does_item_exist(DST): dpg.set_value(DST,dl); dpg.configure_item(DST,color=dc)
     if dpg.does_item_exist(DT):
-        if _ds["running"]: dpg.set_value(DT,f"demo: running on :{_ds['port']} (pid {_ds['pid']})"); dpg.configure_item(DT,color=(80,210,100))
-        else: dpg.set_value(DT,"demo: stopped"); dpg.configure_item(DT,color=(110,110,110))
+        if _ds["running"]: dpg.set_value(DT,f"  port :{_ds['port']} (pid {_ds['pid']})")
+        else: dpg.set_value(DT,"")
     if dpg.does_item_exist("btn_demo_stop"): dpg.configure_item("btn_demo_stop",enabled=_ds["running"])
 def dq():
     for _ in range(200):
-        try: k,p=_q.get_nowait()
+        try: k,p,*a=_q.get_nowait()
         except: break
         if k=="state": _st.update(p); ap()
         elif k=="demo_state": _ds.update(p); ap()
         elif k=="vram" and dpg.does_item_exist(VT): dpg.set_value(VT,p)
         elif k=="ram" and dpg.does_item_exist(RT): dpg.set_value(RT,p)
+        elif k=="log":
+            ln,clr=p,a[0] if a else _cl(p)
+            if dpg.does_item_exist(LG):
+                item=dpg.add_text(ln,parent=LG,color=clr,wrap=0)
+                _log.append(item)
+                if len(_log)>ML:
+                    old=_log[:len(_log)-ML]; del _log[:len(_log)-ML]
+                    for o in old:
+                        if dpg.does_item_exist(o): dpg.delete_item(o)
+                if dpg.get_value("autoscroll_chk"): dpg.set_y_scroll(LG,1e9)
 def tf(fn,tg):
     off=0
     while not _sd.is_set():
@@ -64,7 +91,15 @@ def hw():
         else:
             if w: ct("gui","--- backend unreachable ---"); w=False
             _q.put(("state",{"ok":False,"warming_up":False,"busy":False,"warmup_error":"","device":"-","text_encoder_profile":"-","loaded_datasets":[]}))
-        a,p,pt=bc.demo_status(); _q.put(("demo_state",{"running":a,"pid":p,"port":pt}))
+        a,p,pt=bc.demo_status()
+        demo_ready=False
+        if a and pt:
+            try:
+                import urllib.request
+                urllib.request.urlopen(f"http://127.0.0.1:{pt}",timeout=2)
+                demo_ready=True
+            except: pass
+        _q.put(("demo_state",{"running":a,"pid":p,"port":pt,"ready":demo_ready}))
         _sd.wait(1.0)
 def mw():
     while not _sd.is_set():
@@ -154,14 +189,20 @@ def bg():
             dpg.add_button(label="Stop Backend",tag="btn_stop",callback=stb)
         dpg.add_separator()
         with dpg.group(horizontal=True):
-            dpg.add_text("demo: stopped",tag=DT,color=(110,110,110))
+            with dpg.drawlist(width=26,height=26):
+                dpg.draw_circle(center=(13,13),radius=9,tag=DC,fill=(110,110,110),color=(0,0,0,0))
+            dpg.add_text("STOPPED",tag=DST,color=(110,110,110))
+            dpg.add_text("",tag=DT)
         with dpg.group(horizontal=True):
-            dpg.add_button(label="Open Web Demo",tag="btn_demo_start",callback=sdm)
+            dpg.add_button(label="Start Web Demo",tag="btn_demo_start",callback=sdm)
             dpg.add_button(label="Stop Demo",tag="btn_demo_stop",callback=spd)
             dpg.add_button(label="Log Folder",callback=olf)
         dpg.add_separator()
-        dpg.add_text("Console window is the log -- [backend] [demo] [gui] tags.",color=(100,105,115),wrap=600)
-    dpg.create_viewport(title="KimoDer -- Kimodo+Cascadeur Control",width=700,height=460)
+        with dpg.group(horizontal=True):
+            dpg.add_text("Log:",color=(140,145,155))
+            dpg.add_checkbox(label="Autoscroll",tag="autoscroll_chk",default_value=True)
+        with dpg.child_window(tag=LG,border=True,height=280,horizontal_scrollbar=True): pass
+    dpg.create_viewport(title="KimoDer -- Kimodo+Cascadeur Control",width=720,height=740)
     dpg.setup_dearpygui(); dpg.show_viewport(); dpg.set_primary_window("main_window",True)
 def co():
     global _owned; _sd.set()
