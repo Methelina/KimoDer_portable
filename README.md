@@ -9,6 +9,7 @@ KimoDer combines two independent technologies into a single portable pipeline:
 | Component | What it does |
 |-----------|-------------|
 | **[Kimodo](https://github.com/NVlabs/kimodo)** | NVIDIA's motion diffusion model. Takes a text description ("a person jumps over an obstacle") and generates a full-body skeleton animation. Runs on a local GPU, no cloud. |
+| **Text encoder** | Custom merged 4-bit NF4 encoder: [`Aero-Ex/KIMODO-Meta3_llm2vec_NF4`](https://huggingface.co/Aero-Ex/KIMODO-Meta3_llm2vec_NF4) — **~3× lighter** than the default LLM2Vec build, fits into **8 GB VRAM**. Original default builds used 17–20 GB (LLAMA full) or up to 10 GB (LLAMA 8-bit + CPU offload). |
 | **[Cascadeur](https://cascadeur.com/)** | Professional 3D character animation software with physics-assisted posing and a Python scripting API. Industry-standard tool for keyframe animation. **Not included in the package** — you must download it separately. |
 
 ### Why combine them?
@@ -139,5 +140,5 @@ Repository/
 ## Credits
 
 - Kimodo: [NVIDIA Research](https://research.nvidia.com/labs/sil/projects/kimodo/)
-- Portable launcher & Cascadeur integration: [Soror L.'.L.'.](https://github.com/Methelina/KimoDer_portable)
+- Portable launcher/GUI/RnD with Cascadeur integration: [Soror L.'.L.'.](https://github.com/Methelina/KimoDer_portable)
 - Inspired by Anoxxy's scripts and his WSL/Linux/Ubuntu hybrid: [video](https://youtu.be/yu2X-zS840A)
