@@ -839,9 +839,10 @@ function Install-Kimodo {
     }
 
     # ---- 7. ML dependencies ----
-    Write-Status "Installing bitsandbytes and transformers..." "INFO"
+    Write-Status "Installing bitsandbytes, transformers, dearpygui..." "INFO"
     Invoke-UvPipInstall "bitsandbytes"
     Invoke-UvPipInstall "transformers==5.1.0"
+    Invoke-UvPipInstall "dearpygui"
 
     # ---- 8. Download LLM2Vec model (pycurl, no huggingface_hub) ----
     Write-Status "Downloading LLM2Vec model (NF4) via pycurl..." "INFO"
