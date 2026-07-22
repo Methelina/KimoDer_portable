@@ -14,11 +14,13 @@ One-click portable installer for [Kimodo](https://github.com/NVlabs/kimodo) moti
 
 ## GUI Control Panel
 
-Two-section layout with per-service status indicators:
+Two-section layout with per-service status indicators, plus a live system load bar:
 
+- **Status bar** — `GPU <%> VRAM: X/YGb || RAM <%> X/YGb`, orange GPU/RAM labels, refreshed every 3 s
 - **Cascadeur BackEnd** (port 9552) — colored circle indicator (gray=down, yellow=warming, green=ready, blue=busy, red=error), Start/Stop buttons for LLAMA NF4 and LLAMA OFF modes, Cascadeur link display
-- **Kimodo Viser** — colored circle indicator (gray=stopped, yellow=loading, green=ready), Start/Stop Viser buttons, Log Folder
-- **Live log** — console + GUI log area with adaptive word wrap, service tags `[Cascadeur BackEnd]`, `[Kimodo Viser]`, `[GUI]` and type symbols (`!` error, `*` warn, `+` ok, `.` status, `>` action). Log re-wraps dynamically on window resize.
+- **Kimodo Viser** — colored circle indicator (gray=stopped, yellow=loading, green=ready), port shown in the section header while running, Start/Stop Viser, Log Folder, and an **Open Viser** button that unlocks (green text) once Viser is ready and opens the web UI in the browser. Readiness is detected from the `listening` line in the Viser log and verified over HTTP — no false "ready" before the server actually accepts connections (up to 8 min startup timeout)
+- **Live log** — console + GUI log area with adaptive word wrap, service tags `[Cascadeur BackEnd]`, `[Kimodo Viser]`, `[GUI]` and type symbols (`!` error, `*` warn, `+` ok, `.` status, `>` action). Log re-wraps dynamically on window resize. **Auto-scroll** checkbox toggles following new lines
+- **Tooltips** — every button explains itself on hover
 - **Process discipline** — closing the GUI triggers a graceful shutdown: stops demo, stops backend, sweeps all zombie Python processes from the venv
 
 ## CLI Reference
@@ -50,8 +52,8 @@ Two-section layout with per-service status indicators:
 ## Cascadeur Integration
 
 1. Install Cascadeur separately
-2. From the GUI or CLI: `-InstallCascadeurCommand` (asks for Cascadeur path)
-3. Start the backend (GUI button or `-StartBackend`)
+2. After environment install, the installer **offers to install the Cascadeur Command right away** (Y/n) — accept, or defer and run it later via installer menu item 3 (`Install Cascadeur Command`)
+3. Launch the GUI (`.\Run_KimoDer.ps1`) and press **Start (LLAMA NF4)**
 4. In Cascadeur: **Animation Scripts → Kimodo Roundtrip**
 
 If you move the Repository folder, rerun `scripts\install_cascadeur_command.ps1` to update paths.
