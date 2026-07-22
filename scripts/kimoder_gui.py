@@ -53,13 +53,14 @@ def dq():
             if len(_logbuf)>200: del _logbuf[:100]
             dpg.set_value(LG,"\n".join(_logbuf))
 def tf(fn,tg):
-    off=0
+    off=0; first=True
     while not _sd.is_set():
         try:
             lp=fn()
             if lp.is_file():
                 sz=lp.stat().st_size
-                if sz<off: off=0
+                if first: off=sz; first=False
+                if sz<off: off=sz
                 if sz>off:
                     with open(lp,"r",encoding="utf-8",errors="replace") as f: f.seek(off); ck=f.read()
                     off=lp.stat().st_size
@@ -210,8 +211,9 @@ def main():
     if not bc.is_installed(): print("[gui] Environment not installed."); return 1
     print("[gui] KimoDer GUI starting...",flush=True)
     print(f"[gui] Repo root: {bc.repo_root()}",flush=True)
-    print(f"[gui] Backend log: {bc.log_path()}",flush=True)
-    print(f"[gui] Demo log: {bc.demo_log_path()}",flush=True)
+    for p in (bc.log_path(), bc.demo_log_path()):
+        try: p.write_text("",encoding="utf-8")
+        except: pass
     bg()
     for w in [threading.Thread(target=tf,args=(bc.log_path,"backend"),daemon=True),
               threading.Thread(target=tf,args=(bc.demo_log_path,"demo"),daemon=True),
