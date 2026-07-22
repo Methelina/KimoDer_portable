@@ -14,6 +14,7 @@ import csc
 import numpy as np
 import common.selection_operations as so
 import rig_mode.off as rm_off
+from pycsc import data_constants as c_dc
 
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "kimodo_roundtrip.ini")
@@ -1006,6 +1007,8 @@ def _project_pelvis_heading_rotation(rotation):
 
 
 def _write_constraint_npz(
+
+
     scene,
     joint_ids,
     source_constraint_frames,
